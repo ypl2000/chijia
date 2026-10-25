@@ -789,7 +789,7 @@ function renderGuide(){
   const mkBtn = (label) => { const b = el("button", "", label); b.style.cssText = "background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);"; return b; };
   const expBtn = mkBtn("💾 导出我的数据（JSON 备份）");
   expBtn.addEventListener("click", () => {
-    const payload = JSON.stringify({ app: "finance-report-cn", version: 1, exportedAt: new Date().toISOString(), data: DATA }, null, 2);
+    const payload = JSON.stringify({ app: "chijia", version: 1, exportedAt: new Date().toISOString(), data: DATA }, null, 2);
     const blob = new Blob([payload], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = "finance-report-data.json"; a.click();
