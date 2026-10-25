@@ -1829,7 +1829,20 @@ function boot(){
   if (location.search.indexOf("app=1") >= 0) document.body.classList.add("app-mode");
   renderHero(); renderGuide(); renderOverview(); renderParts(); renderFoot(); bindInteractions();
   cardify12();
+  window.__chijiaReady = true;   /* APP 壳据此判断 iframe 已就绪，可接收指令 */
 }
+/* 首页（APP 壳）指令：打开指定面板 */
+window.addEventListener("message", e => {
+  if (!e.data || e.data.ffOpen !== "import" && e.data.ffOpen !== "plan" && e.data.ffOpen !== "income" && e.data.ffOpen !== "guide") return;
+  const map = { import: "sec-import", plan: "sec-plan", income: "sec-import", guide: "sec-guide" };
+  const sec = document.getElementById(map[e.data.ffOpen]);
+  if (!sec) return;
+  sec.open = true; sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (e.data.ffOpen === "income") {
+    const sp = document.getElementById("spendAdj");
+    if (sp) { sp.scrollIntoView({ behavior: "smooth", block: "center" }); sp.focus(); }
+  }
+});
 /* 窄屏：逐月执行表切换为「每月一卡」 */
 function cardify12(){
   const wrap = document.querySelector("#sec-1-2 .tbl-wrap");

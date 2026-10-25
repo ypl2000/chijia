@@ -13,10 +13,10 @@
   body{
     margin:0;display:flex;flex-direction:column;height:100%;
     background:#f4f6fa;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-    overscroll-behavior:none;
+    overscroll-behavior:none;color:#1c2333;
   }
   @media (prefers-color-scheme: dark){
-    body{background:#11151d;}
+    body{background:#11151d;color:#e8ecf5;}
   }
   header.top{
     flex:none;display:flex;align-items:center;gap:10px;
@@ -31,12 +31,61 @@
     display:none;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.15);
     color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;
   }
-  .views{flex:1;position:relative;overflow:hidden;background:#f4f6fa;}
+  .views{flex:1;position:relative;overflow:hidden;overflow-y:auto;background:#f4f6fa;}
   @media (prefers-color-scheme: dark){ .views{background:#11151d;} }
-  .views iframe{
-    position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:transparent;
+  .views > iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:transparent;}
+  .views > iframe.active{display:block;}
+
+  /* ===== 首页 ===== */
+  #view-home{display:none;padding:18px 16px calc(20px + env(safe-area-inset-bottom, 0));max-width:560px;margin:0 auto;}
+  #view-home.active{display:block;}
+  .home-hero{
+    background:linear-gradient(135deg,#22315c 0%,#2f6fed 100%);color:#fff;
+    border-radius:16px;padding:20px 18px;margin-bottom:16px;
   }
-  .views iframe.active{display:block;}
+  .home-hero .h-logo{font-size:20px;font-weight:800;letter-spacing:1px;}
+  .home-hero .h-tag{font-size:13px;opacity:.85;margin-top:6px;}
+  .home-hero .h-lock{display:inline-block;margin-top:10px;font-size:11.5px;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:3px 12px;}
+  .step{
+    background:#fff;border:1px solid #e6e9f0;border-radius:14px;
+    padding:14px;margin-bottom:12px;display:flex;gap:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    .step{background:#1a2130;border-color:#2a3242;}
+    .rulebox{background:#161d2a;border-color:#2a3242;}
+    .entry{background:#1a2130;border-color:#2a3242;}
+    .gobtn.ghost{background:#1a2130;color:#e8ecf5;border-color:#2a3242;}
+  }
+  .s-no{
+    flex:none;width:30px;height:30px;border-radius:50%;background:#2f6fed;color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;
+  }
+  .s-body{flex:1;}
+  .s-t{font-weight:800;font-size:15px;margin-bottom:2px;}
+  .s-d{font-size:12.5px;color:#5a6478;margin-bottom:10px;}
+  @media (prefers-color-scheme: dark){ .s-d{color:#9aa3b5;} }
+  .gobtn{
+    background:#2f6fed;color:#fff;border:none;border-radius:999px;
+    padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px;margin-bottom:4px;
+  }
+  .gobtn.ghost{background:transparent;color:inherit;border:1px solid #d7deea;}
+  .rulebox{
+    background:#fff;border:1px solid #e6e9f0;border-radius:14px;padding:14px;
+    font-size:12.5px;color:#5a6478;margin-bottom:16px;line-height:1.8;
+  }
+  .entries{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .entry{
+    background:#fff;border:1px solid #e6e9f0;border-radius:12px;padding:12px 10px;
+    text-align:center;cursor:pointer;font-size:12px;
+  }
+  .entry .e-ico{font-size:22px;display:block;margin-bottom:4px;}
+  .entry .e-t{font-weight:700;font-size:13px;}
+  .entry .e-d{color:#5a6478;font-size:11px;margin-top:2px;}
+  @media (prefers-color-scheme: dark){
+    .entry{background:#1a2130;border-color:#2a3242;}
+    .entry .e-d{color:#9aa3b5;}
+  }
+
   nav.tabs{
     flex:none;display:flex;background:#22315c;color:#8f9bb3;
     padding-bottom:env(safe-area-inset-bottom, 0);
@@ -62,11 +111,72 @@
 </header>
 
 <div class="views" id="views">
-  <iframe id="view-report" class="active" title="资金计划" src="./report.html?app=1"></iframe>
+
+  <!-- 🏠 首页 -->
+  <div id="view-home" class="active">
+    <div class="home-hero">
+      <div class="h-logo">持家 chijia</div>
+      <div class="h-tag">本地优先的个人财务工作台——流水变报告，数据不出设备</div>
+      <span class="h-lock">🔒 全部计算在本地完成，不上传任何数据</span>
+    </div>
+
+    <div class="step">
+      <div class="s-no">1</div>
+      <div class="s-body">
+        <div class="s-t">上传银行流水（凭证）</div>
+        <div class="s-d">选择流水 PDF（内置交通银行·个人客户交易清单格式），自动生成流水概况、收入结构（含近 12 个月平均收入与补贴统计）和大额支出。也支持复制粘贴，全程本地解析。</div>
+        <button class="gobtn" data-go="report:import">📥 去导入流水</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="s-no">2</div>
+      <div class="s-body">
+        <div class="s-t">调整计划参数（账本）</div>
+        <div class="s-d">计划月数、每月定投 / 安全垫 / ESOP 预备、一次性收支（还债、车险、年终奖……）都能改——改完第一部分计划与预期分布自动重算。</div>
+        <button class="gobtn" data-go="report:plan">🎛 去调参数</button>
+        <button class="gobtn ghost" data-go="report:income">💰 看收入口径</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="s-no">3</div>
+      <div class="s-body">
+        <div class="s-t">看分析与资金计划</div>
+        <div class="s-d">流水概况、收入结构、消费画像、逐月执行表、预期仓位、健康度双口径评估——都在「计划」Tab 里，默认折叠，点开即看。</div>
+        <button class="gobtn" data-go="report">📖 打开资金计划</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="s-no">4</div>
+      <div class="s-body">
+        <div class="s-t">财富自由还要多少年？</div>
+        <div class="s-d">把收入、支出、持仓一键带给计算器（要多少钱、还要几年）和组合体检（你的持仓配不配得上收益假设）。</div>
+        <button class="gobtn" data-go="calculator">🧮 去计算器</button>
+        <button class="gobtn ghost" data-go="portfolio">🧪 去组合体检</button>
+      </div>
+    </div>
+
+    <div class="rulebox">
+      <b>数据规则：</b><b>数据包 JSON 是账本（主数据源）</b>，流水 PDF 是<b>凭证（补充输入）</b>，两者都只在当前标签页会话里——<b>关闭浏览器自动清空</b>。长期保留用各面板里的「导出备份 JSON」，换设备恢复也靠它。
+    </div>
+
+    <div class="entries">
+      <div class="entry" data-go="report"><span class="e-ico">📋</span><span class="e-t">资金计划</span><span class="e-d">分析与推演</span></div>
+      <div class="entry" data-go="calculator"><span class="e-ico">🧮</span><span class="e-t">FIRE 计算器</span><span class="e-d">三档模型</span></div>
+      <div class="entry" data-go="portfolio"><span class="e-ico">🧪</span><span class="e-t">组合体检</span><span class="e-d">四维红绿灯</span></div>
+    </div>
+  </div>
+
+  <iframe id="view-report" title="资金计划" src="./report.html?app=1"></iframe>
+  <iframe id="view-calculator" title="财富自由计算器"></iframe>
+  <iframe id="view-portfolio" title="组合体检"></iframe>
 </div>
 
 <nav class="tabs">
-  <button data-view="report" class="active"><span class="ico">📋</span>计划</button>
+  <button data-view="home" class="active"><span class="ico">🏠</span>首页</button>
+  <button data-view="report"><span class="ico">📋</span>计划</button>
   <button data-view="calculator"><span class="ico">🧮</span>计算器</button>
   <button data-view="portfolio"><span class="ico">🧪</span>体检</button>
 </nav>
@@ -74,37 +184,46 @@
 <script>
 "use strict";
 const VIEWS = {
-  report:     { file: "./report.html?app=1",     title: "资金计划" },
-  calculator: { file: "./calculator.html?app=1", title: "财富自由计算器" },
-  portfolio:  { file: "./portfolio.html?app=1",  title: "组合体检" }
+  report:     { file: "./report.html?app=1" },
+  calculator: { file: "./calculator.html?app=1" },
+  portfolio:  { file: "./portfolio.html?app=1" }
 };
-const created = { report: document.getElementById("view-report") };
-let active = "report";
+const iframes = {
+  report: document.getElementById("view-report"),
+  calculator: document.getElementById("view-calculator"),
+  portfolio: document.getElementById("view-portfolio")
+};
 
 function activate(name){
-  if (!VIEWS[name]) return;
-  if (!created[name]) {
-    const f = document.createElement("iframe");
-    f.id = "view-" + name;
-    f.title = VIEWS[name].title;
-    f.src = VIEWS[name].file;
-    document.getElementById("views").appendChild(f);
-    created[name] = f;
-  }
-  Object.entries(created).forEach(([k, f]) => f.classList.toggle("active", k === name));
+  document.getElementById("view-home").classList.toggle("active", name === "home");
+  Object.keys(iframes).forEach(k => {
+    if (name === k && !iframes[k].src) iframes[k].src = VIEWS[k].file + "&app=1";
+    iframes[k].classList.toggle("active", name === k && !!iframes[k].src);
+  });
   document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
-  active = name;
 }
-document.querySelectorAll("nav.tabs button").forEach(b =>
-  b.addEventListener("click", () => activate(b.dataset.view))
+
+/* 带「打开指定面板」的跳转：先切 Tab，待 iframe 就绪后 postMessage */
+function go(target){
+  const [view, panel] = target.split(":");
+  activate(view);
+  if (panel && view === "report"){
+    const f = iframes.report;
+    const post = () => { try { f.contentWindow.postMessage({ ffOpen: panel }, "*"); } catch(e){} };
+    if (f.contentDocument && f.contentDocument.readyState === "complete" && f.contentWindow.__chijiaReady) post();
+    else f.addEventListener("load", () => setTimeout(post, 300), { once: true });
+  }
+}
+document.querySelectorAll("[data-go]").forEach(b =>
+  b.addEventListener("click", () => go(b.dataset.go))
 );
 
-/* 资金报告点「发送到财富自由计算器」后，切到计算器 Tab（同 APP 内导航，不弹新窗） */
+/* 资金报告点「发送到财富自由计算器」→ 切到计算器 Tab */
 window.addEventListener("message", e => {
-  if (e.data && e.data.ffSwitch && VIEWS[e.data.ffSwitch]) activate(e.data.ffSwitch);
+  if (e.data && e.data.ffSwitch && (VIEWS[e.data.ffSwitch] || e.data.ffSwitch === "home")) activate(e.data.ffSwitch);
 });
 
-/* PWA：注册 Service Worker + 安装入口（file:// 打开时自动跳过，功能不受影响） */
+/* PWA：Service Worker + 安装入口（file:// 打开时自动跳过） */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
