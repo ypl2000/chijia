@@ -252,10 +252,11 @@ function recalc(){
   const s = readState();
   const c = compute(s);
   const pct = x => (x * 100).toFixed(1) + "%";
+  $("yearsV").textContent = s.years;   /* 滑杆数字实时跟随，否则拖动像没反应 */
 
   /* 收益对比条：0~10% 坐标 */
   const scale = v => Math.max(0, Math.min(100, v / 10 * 100));
-  $("rFill").style.width = (c.rEff === null ? 0 : scale(c.rEff)) + "%";
+  $("rFill").style.width = (c.rEff === null ? 0 : scale(c.rEff * 100)) + "%";
   $("rMark").style.left = scale(s.modelR) + "%";
   $("rEffBig").textContent = c.rEff === null ? "—" : (c.rEff * 100).toFixed(2) + "%";
   $("rNominalLine").textContent = "名义 " + (c.rNominal === null ? "—" : (c.rNominal * 100).toFixed(2) + "%") +
@@ -265,10 +266,11 @@ function recalc(){
   if (c.rEff === null) setLight(1, "r", "无生息资产", "四个生息桶都是 0——先让钱进入组合。");
   else {
     const mr = s.modelR / 100;
+    const rLabel = s.modelR.toFixed(1) + "%";
     const diff = (c.rEff - mr) * 100;
-    if (diff >= 0) setLight(1, "g", "达标", "有效收益 " + pct(c.rEff) + " ≥ 模型假设 " + mr.toFixed(1) + "%，组合撑得起这个假设。");
-    else if (diff >= -1) setLight(1, "y", "勉强", "有效收益比模型假设低 " + Math.abs(diff).toFixed(2) + "pp——缺口不大，调仓或微调假设二选一。");
-    else setLight(1, "r", "不达标", "有效收益 " + pct(c.rEff) + " < 模型假设 " + mr.toFixed(1) + "%：按 " + mr.toFixed(1) + "% 测算的本金需求被低估了。");
+    if (diff >= 0) setLight(1, "g", "达标", "有效收益 " + pct(c.rEff) + " ≥ 模型假设 " + rLabel + "，组合撑得起这个假设。");
+    else if (diff >= -1) setLight(1, "y", "勉强", "有效收益比模型假设 " + rLabel + " 低 " + Math.abs(diff).toFixed(2) + "pp——缺口不大，调仓或微调假设二选一。");
+    else setLight(1, "r", "不达标", "有效收益 " + pct(c.rEff) + " < 模型假设 " + rLabel + "：按 " + rLabel + " 测算的本金需求被低估了。");
   }
   /* 灯 2：集中度 */
   if (s.esop === 0) setLight(2, "g", "无公司股权", "不持有与工资同源的公司股权——此项无风险。");
