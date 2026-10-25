@@ -135,7 +135,7 @@
       <div class="s-body">
         <div class="s-t">调整计划参数（账本）</div>
         <div class="s-d">计划月数、每月定投 / 安全垫 / ESOP 预备、一次性收支（还债、车险、年终奖……）都能改——改完第一部分计划与预期分布自动重算。每月支出在「设置」页的③收入口径处调整。</div>
-        <button class="gobtn" data-go="report:plan">🎛 去调参数</button>
+        <button class="gobtn" data-go="plan:plan">🎛 去调参数</button>
         <button class="gobtn ghost" data-go="settings">💰 看收入口径</button>
       </div>
     </div>
@@ -145,7 +145,7 @@
       <div class="s-body">
         <div class="s-t">看分析与资金计划</div>
         <div class="s-d">流水概况、收入结构、消费画像、逐月执行表、预期仓位、健康度双口径评估——都在「计划」Tab 里，默认折叠，点开即看。</div>
-        <button class="gobtn" data-go="report">📖 打开资金计划</button>
+        <button class="gobtn" data-go="plan">📖 打开资金计划</button>
       </div>
     </div>
 
@@ -165,7 +165,8 @@
 
   </div>
 
-  <iframe id="view-report" title="资金计划" src="./report.html?app=1"></iframe>
+  <iframe id="view-plan" title="资金计划"></iframe>
+  <iframe id="view-analysis" title="财务分析"></iframe>
   <iframe id="view-calculator" title="财富自由计算器"></iframe>
   <iframe id="view-portfolio" title="组合体检"></iframe>
   <iframe id="view-settings" title="设置"></iframe>
@@ -173,7 +174,8 @@
 
 <nav class="tabs">
   <button data-view="home" class="active"><span class="ico">🏠</span>首页</button>
-  <button data-view="report"><span class="ico">📋</span>计划</button>
+  <button data-view="plan"><span class="ico">📋</span>计划</button>
+  <button data-view="analysis"><span class="ico">🔎</span>分析</button>
   <button data-view="calculator"><span class="ico">🧮</span>计算器</button>
   <button data-view="portfolio"><span class="ico">🧪</span>体检</button>
   <button data-view="settings"><span class="ico">⚙️</span>设置</button>
@@ -182,13 +184,15 @@
 <script>
 "use strict";
 const VIEWS = {
-  report:     { file: "./report.html?app=1" },
+  plan:       { file: "./plan.html?app=1" },
+  analysis:   { file: "./analysis.html?app=1" },
   calculator: { file: "./calculator.html?app=1" },
   portfolio:  { file: "./portfolio.html?app=1" },
   settings:   { file: "./settings.html?app=1" }
 };
 const iframes = {
-  report: document.getElementById("view-report"),
+  plan: document.getElementById("view-plan"),
+  analysis: document.getElementById("view-analysis"),
   calculator: document.getElementById("view-calculator"),
   portfolio: document.getElementById("view-portfolio"),
   settings: document.getElementById("view-settings")
@@ -197,7 +201,7 @@ const iframes = {
 function activate(name){
   document.getElementById("view-home").classList.toggle("active", name === "home");
   Object.keys(iframes).forEach(k => {
-    if (name === k && !iframes[k].src) iframes[k].src = VIEWS[k].file + "&app=1";
+    if (name === k && !iframes[k].src) iframes[k].src = VIEWS[k].file + "&app=1&t=" + Date.now();
     iframes[k].classList.toggle("active", name === k && !!iframes[k].src);
   });
   document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
@@ -207,11 +211,11 @@ function activate(name){
 function go(target){
   const [view, panel] = target.split(":");
   activate(view);
-  if (panel && view === "report"){
-    const f = iframes.report;
+  if (panel && iframes[view]) {
+    const f = iframes[view];
     const post = () => { try { f.contentWindow.postMessage({ ffOpen: panel }, "*"); } catch(e){} };
     if (f.contentDocument && f.contentDocument.readyState === "complete" && f.contentWindow.__chijiaReady) post();
-    else f.addEventListener("load", () => setTimeout(post, 300), { once: true });
+    else f.addEventListener("load", () => setTimeout(post, 500), { once: true });
   }
 }
 document.querySelectorAll("[data-go]").forEach(b =>

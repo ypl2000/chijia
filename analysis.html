@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+  var t = Date.now();
+  document.write('<link rel="stylesheet" href="./app.css?v=' + t + '">');
+  document.write('<script src="./data.js?v=' + t + '"><\/script>');
+  document.write('<script src="./formats.js?v=' + t + '"><\/script>');
+  document.write('<script src="./core.js?v=' + t + '"><\/script>');
+</script>
+<title>财务分析 · 持家 chijia</title>
+</head>
+<body class="app-mode">
+<header class="top">
+  <span class="logo">🔎 财务分析</span>
+  <span class="sub">持家 chijia · 本地计算</span>
+</header>
+<main class="content">
+  <div id="heroBox"></div>
+  <div id="partsBox"></div>
+  <footer id="footBox"></footer>
+</main>
+<script>window.PAGE_MODE = "analysis";</script>
+<script>
+"use strict";
+(function restoreSavedData(){
+  try {
+    const raw = sessionStorage.getItem("FRI_DATA_V1");
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (obj && obj.data && obj.data.meta && Array.isArray(obj.data.parts)) Object.assign(DATA, obj.data);
+  } catch(e){}
+})();
+boot();
+(function(){
+  try {
+    const raw = sessionStorage.getItem("FRI_TXNS_V1");
+    if (!raw) return;
+    const st = JSON.parse(raw);
+    if (st.txns && st.txns.length) applyImport(st.txns, Object.assign({}, DATA.meta.importer, st.rules), false);
+  } catch(e){}
+})();
+window.addEventListener("storage", e => {
+  if (["FRI_DATA_V1", "FRI_TXNS_V1", "FRI_PLAN", "FRI_SPEND"].includes(e.key)) location.reload();
+});
+window.addEventListener('beforeprint', () => document.querySelectorAll('details.sec, details.sub').forEach(x => x.open = true));
+</script>
+</body>
+</html>

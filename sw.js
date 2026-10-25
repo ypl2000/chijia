@@ -1,11 +1,17 @@
 /* 持家 chijia Service Worker：缓存应用壳，离线可用 */
-const VER = "chijia-v1.0.0";
+const VER = "chijia-v1.1.0";
 const ASSETS = [
   "./",
   "./index.html",
-  "./report.html",
+  "./plan.html",
+  "./analysis.html",
+  "./settings.html",
   "./calculator.html",
   "./portfolio.html",
+  "./app.css",
+  "./data.js",
+  "./core.js",
+  "./formats.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

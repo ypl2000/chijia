@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+  var t = Date.now();
+  document.write('<link rel="stylesheet" href="./app.css?v=' + t + '">');
+  document.write('<script src="./data.js?v=' + t + '"><\/script>');
+  document.write('<script src="./formats.js?v=' + t + '"><\/script>');
+  document.write('<script src="./core.js?v=' + t + '"><\/script>');
+</script>
+<title>资金计划 · 持家 chijia</title>
+</head>
+<body class="app-mode">
+<header class="top">
+  <span class="logo">📋 资金计划</span>
+  <span class="sub">持家 chijia · 本地计算</span>
+</header>
+<main class="content">
+  <div id="heroBox"></div>
+  <div id="overviewBox"></div>
+  <div id="partsBox"></div>
+  <footer id="footBox"></footer>
+</main>
+<script>window.PAGE_MODE = "plan";</script>
+<script>
+"use strict";
+/* 启动：数据包覆盖 → 支出微调 → 计划参数恢复 → 流水恢复（统计维度同步） */
+(function restoreSavedData(){
+  try {
+    const raw = sessionStorage.getItem("FRI_DATA_V1");
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (obj && obj.data && obj.data.meta && Array.isArray(obj.data.parts)) Object.assign(DATA, obj.data);
+  } catch(e){}
+  try {
+    const raw = sessionStorage.getItem("FRI_SPEND");
+    if (raw !== null) {
+      const v = JSON.parse(raw);
+      if (isFinite(v) && v >= 0) DATA.meta.calculator.fields.spend = v;
+    }
+  } catch(e){}
+})();
+boot();
+(function(){
+  try {
+    const raw = sessionStorage.getItem("FRI_PLAN");
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p && p.months) applyPlan(p, false);
+  } catch(e){}
+})();
+try {
+  const raw = sessionStorage.getItem("FRI_TXNS_V1");
+  if (raw) {
+    const st = JSON.parse(raw);
+    if (st.txns && st.txns.length) applyImport(st.txns, Object.assign({}, DATA.meta.importer, st.rules), false);
+  }
+} catch(e){}
+/* 其他页面（设置/分析）改了共享数据 → 重载自己（同 Tab 的 iframe 共享 sessionStorage） */
+window.addEventListener("storage", e => {
+  if (["FRI_DATA_V1", "FRI_TXNS_V1", "FRI_PLAN", "FRI_SPEND"].includes(e.key)) location.reload();
+});
+/* APP 壳指令：打开参数面板 */
+window.addEventListener("message", e => {
+  if (!e.data || e.data.ffOpen !== "plan") return;
+  const sec = document.getElementById("sec-plan");
+  if (sec) { sec.open = true; sec.scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+window.addEventListener('beforeprint', () => document.querySelectorAll('details.sec, details.sub').forEach(x => x.open = true));
+</script>
+</body>
+</html>

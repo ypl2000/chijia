@@ -3,36 +3,289 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>设置 · 数据与流水导入 — 持家 chijia</title>
-<style>
-  *{box-sizing:border-box;}
-  html,body{height:100%;}
-  body{margin:0;display:flex;flex-direction:column;height:100%;background:#f4f6fa;
-    font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;overscroll-behavior:none;}
-  @media (prefers-color-scheme: dark){ body{background:#11151d;} }
-  header.top{
-    flex:none;display:flex;align-items:center;gap:10px;
-    background:linear-gradient(135deg,#22315c 0%,#2f6fed 100%);
-    color:#fff;padding:9px 14px;
-  }
-  header.top .logo{font-weight:800;font-size:14px;letter-spacing:1px;}
-  header.top .sub{font-size:11px;opacity:.8;}
-  header.top .spacer{flex:1;}
-  header.top .lock{font-size:11px;opacity:.75;}
-  .frame{flex:1;position:relative;overflow:hidden;background:#f4f6fa;}
-  @media (prefers-color-scheme: dark){ .frame{background:#11151d;} }
-  iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;}
-</style>
+<script>
+  var t = Date.now();
+  document.write('<link rel="stylesheet" href="./app.css?v=' + t + '">');
+  document.write('<script src="./data.js?v=' + t + '"><\/script>');
+  document.write('<script src="./formats.js?v=' + t + '"><\/script>');
+  document.write('<script src="./core.js?v=' + t + '"><\/script>');
+</script>
+<title>设置 · 持家 chijia</title>
 </head>
-<body>
+<body class="app-mode">
 <header class="top">
   <span class="logo">⚙️ 设置</span>
   <span class="sub">数据与流水导入 / 备份 / 收入口径</span>
   <span class="spacer"></span>
   <span class="lock">🔒 本地处理，不上传</span>
 </header>
-<div class="frame">
-  <iframe src="./report.html?view=settings&app=1" title="设置面板"></iframe>
-</div>
+<main class="content">
+  <div class="callout" style="margin-bottom:14px;">
+    <b>数据规则：</b><b>数据包 JSON 是账本（主数据源）</b>；流水 PDF 是<b>凭证（补充输入）</b>，只更新流水统计与当期余额。
+    导入的数据仅存当前标签页会话，<b>关闭浏览器自动清空</b>；长期保留用「导出备份 JSON」。改动会实时同步到「📋 计划」「🔎 分析」两个 Tab。
+  </div>
+  <div id="host"></div>
+</main>
+<script>window.PAGE_MODE = "settings";</script>
+<script>
+"use strict";
+function buildImporter(){
+  const d = el("details", "sec"); d.id = "sec-import"; d.open = true;
+  d.appendChild(el("summary", "", "📥 数据与流水导入 / 备份（本地处理，不上传）<span class=\"chev\">▼</span>"));
+  const body = el("div", "sec-body");
+  const imp = DATA.meta.importer;
+  body.appendChild(el("p", "sec-sub", '<b>数据规则：</b>① 数据包 JSON 是<b>账本（主数据源）</b>；② 流水 PDF 是<b>凭证（补充输入）</b>，只更新流水统计与当期余额。月度节奏：先 ② 后 ①，导出备份固化，关闭浏览器自动清空。'));
+
+  /* ① 数据包 JSON：导入 / 导出 / 重置（会话级保存，关闭标签页即清空） */
+  body.appendChild(el("h4", "", '① 数据包 JSON <span class="hint">—— 账本 · 主数据源：报告全部数据 + 已导入的流水；仅存当前标签页会话，关闭浏览器自动清空、回到示例数据</span>'));
+  const dataRow = el("div", "");
+  dataRow.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;";
+  const mkBtn2 = (label) => { const b = el("button", "ffc-btn", label); b.style.cssText = "background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;"; return b; };
+  const dataFile = el("input"); dataFile.type = "file"; dataFile.accept = ".json,application/json"; dataFile.style.display = "none";
+  const impDataBtn = mkBtn2("⬆️ 导入数据 JSON");
+  const expDataBtn = mkBtn2("💾 导出备份 JSON");
+  const resetBtn = mkBtn2("🔄 重置为示例数据");
+  const dataStatus = el("span", "", ""); dataStatus.id = "dataStatus";
+  dataStatus.style.cssText = "font-size:12.5px;color:var(--sub);";
+  dataRow.appendChild(impDataBtn); dataRow.appendChild(expDataBtn); dataRow.appendChild(resetBtn); dataRow.appendChild(dataFile); dataRow.appendChild(dataStatus);
+  body.appendChild(dataRow);
+
+  /* ② 银行流水解析 */
+  body.appendChild(el("h4", "", '② 银行流水解析 <span class="hint">—— 凭证 · 补充输入：只生成 2.1 / 2.2 / 2.3 并同步当期余额</span>'));
+  body.appendChild(el("p", "sec-sub", '支持<b>直接选择 PDF</b>（可多选；首次使用需联网加载解析组件，解析本身仍在本地完成）或 .txt / .csv，也可把 PDF 里的文本全选复制粘贴到下面；点「解析并预览」后「应用到报告」。解析按"行号 + 日期 + 时间 + 类型 + C/D + 金额 + 余额 + 账号 + 户名摘要"的流水清单格式逐行识别。'));
+  const grid = el("div", "");
+  grid.style.cssText = "display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px;";
+  const field = (label, id, val, type, w) => {
+    const dv = el("div", "");
+    dv.appendChild(el("label", "", label)).style.cssText = "display:block;font-size:12px;color:var(--sub);margin-bottom:3px;";
+    const inp = el("input", "", ""); inp.id = id; inp.type = type || "text"; inp.value = val;
+    inp.style.cssText = `border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;width:${w || 150}px;background:#fff;`;
+    dv.appendChild(inp); return dv;
+  };
+  grid.appendChild(field("雇主户名关键词（留空 = 不限雇主）", "impEmployer", imp.employer, "text", 160));
+  grid.appendChild(field("补贴摘要关键词（逗号分隔）", "impSubsidy", imp.subsidyKeywords.join(","), "text", 200));
+  grid.appendChild(field("奖金判定下限（元）", "impBonus", imp.bonusMin, "number", 120));
+  grid.appendChild(field("大额支出阈值（元）", "impBig", imp.bigExpenseMin, "number", 120));
+  const file = el("input", "", ""); file.type = "file"; file.accept = ".pdf,.txt,.csv,text/plain"; file.multiple = true;
+  file.style.cssText = "font-size:12.5px;";
+  const wrapFile = el("div", "");
+  wrapFile.appendChild(el("label", "", "或选择文件（可多选：PDF / TXT / CSV）")).style.cssText = "display:block;font-size:12px;color:var(--sub);margin-bottom:3px;";
+  wrapFile.appendChild(file);
+  grid.appendChild(wrapFile);
+  body.appendChild(grid);
+  const ta = el("textarea", "", "");
+  ta.id = "impText"; ta.rows = 6; ta.placeholder = "在此粘贴流水文本……（每一行形如：12 2024-05-15 12:00:00 代发工资 C 15248.00 39575.77 4000056… 公司户名 工资）";
+  ta.style.cssText = "width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical;";
+  body.appendChild(ta);
+  const btns = el("div", "");
+  btns.style.cssText = "display:flex;gap:10px;margin:12px 0;flex-wrap:wrap;align-items:center;";
+  const mkBtn = (id, label, primary) => { const b = el("button", "ffc-btn", label); b.id = id; b.style.cssText = primary ? "" : "background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;"; return b; };
+  btns.appendChild(mkBtn("impParse", "🔍 解析并预览", true));
+  btns.appendChild(mkBtn("impApply", "✅ 应用到报告", false));
+  btns.appendChild(mkBtn("impClear", "🗑 清除导入数据", false));
+  const status = el("span", "", ""); status.id = "impStatus";
+  status.style.cssText = "font-size:13px;color:var(--sub);";
+  btns.appendChild(status);
+  body.appendChild(btns);
+  const prev = el("div", "", ""); prev.id = "impPreview";
+  body.appendChild(prev);
+
+  /* ③ 收入口径（近 12 个月 · 含奖金）与可调月支出 */
+  body.appendChild(el("h4", "", '③ 收入口径（近 12 个月 · 含奖金）与月支出 <span class="hint">—— 发送计算器 / 组合体检 / 「还要多少年」共用这两个口径</span>'));
+  const incRow = el("div", "");
+  incRow.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;";
+  incRow.appendChild(el("label", "", "每月支出")).style.cssText = "font-size:12.5px;color:var(--sub);flex:none;";
+  const spendAdj = el("input", "", ""); spendAdj.id = "spendAdj"; spendAdj.type = "number"; spendAdj.min = 0; spendAdj.step = 100;
+  spendAdj.style.cssText = "width:110px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:13.5px;text-align:right;background:#fff;";
+  incRow.appendChild(spendAdj);
+  incRow.appendChild(el("span", "unit", "元/月（调整后同步计算器与组合体检）"));
+  body.appendChild(incRow);
+  const incC1 = el("div", "", ""); incC1.id = "incC1"; incC1.style.cssText = "font-size:13.5px;margin:4px 0;";
+  const incC2 = el("div", "", ""); incC2.id = "incC2"; incC2.style.cssText = "font-size:13.5px;margin:4px 0;";
+  const incSrc = el("div", "", ""); incSrc.id = "incSrc"; incSrc.style.cssText = "font-size:12px;color:var(--sub);margin-top:2px;";
+  body.appendChild(incC1); body.appendChild(incC2); body.appendChild(incSrc);
+
+  d.appendChild(body);  /* 先入树，再绑事件（下方局部查询依赖 d 已包含 body） */
+  /* 交互（注意：此时 d 尚未入文档，须用局部查询而非 getElementById） */
+  let lastTxns = null, lastRules = null;
+  const q = (sel) => d.querySelector(sel);
+
+  /* ① 数据包：导出 / 导入 / 重置（会话级） */
+  const DATA_KEY = "FRI_DATA_V1";
+  const refreshDataStatus = () => {
+    try {
+      const raw = sessionStorage.getItem(DATA_KEY);
+      const st = q("#dataStatus");
+      if (!st) return;
+      if (!raw) { st.textContent = "当前：示例数据（导入后仅存本标签页，关闭浏览器自动清空）"; return; }
+      const obj = JSON.parse(raw);
+      st.textContent = "当前：已载入数据包 · " + new Date(obj.savedAt).toLocaleString() + "（关闭浏览器自动清空）";
+    } catch(e){}
+  };
+  impDataBtn.addEventListener("click", () => dataFile.click());
+  dataFile.addEventListener("change", async () => {
+    const f = dataFile.files && dataFile.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      if (!obj || !obj.data || !obj.data.meta || !Array.isArray(obj.data.parts)) throw new Error("结构不符");
+      Object.keys(DATA).forEach(k => delete DATA[k]);
+      Object.assign(DATA, obj.data);
+      try { sessionStorage.setItem(DATA_KEY, JSON.stringify({ savedAt: Date.now(), data: obj.data })); } catch(e){}
+      if (obj.txns && obj.txns.length) {
+        try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules: obj.txnsRules || DATA.meta.importer, txns: obj.txns })); } catch(e){}
+      }
+      refreshDataStatus();
+      alert("数据包已导入（仅存当前标签页会话，关闭浏览器自动清空）。「📋 计划」「🔎 分析」页会通过会话同步自动更新；长期保留请点「💾 导出备份 JSON」。");
+    } catch (e) {
+      alert("导入失败：" + e.message + "——请选择由「💾 导出备份 JSON」生成的文件。");
+    }
+    dataFile.value = "";
+  });
+  expDataBtn.addEventListener("click", () => {
+    let txns = null, txnsRules = null;
+    try { const raw = sessionStorage.getItem(LS_KEY); if (raw) { const o = JSON.parse(raw); txns = o.txns; txnsRules = o.rules; } } catch(e){}
+    const payload = JSON.stringify({ app: "chijia", version: 1, exportedAt: new Date().toISOString(), data: DATA, txns, txnsRules }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "chijia-data.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  });
+  resetBtn.addEventListener("click", () => {
+    if (!confirm("重置为示例数据？当前载入的数据包与已导入的流水将被清除（不影响你导出的备份文件）。")) return;
+    sessionStorage.removeItem(DATA_KEY);
+    sessionStorage.removeItem(LS_KEY);
+    sessionStorage.removeItem("FRI_SPEND");
+    location.reload();
+  });
+  refreshDataStatus();
+
+  /* ③ 收入口径：优先用本会话流水实时计算，其次数据包，最后计划默认 */
+  const incomeFromTxns = () => {
+    const st = loadStoredImport();
+    if (!st || !st.txns || !st.txns.length) return null;
+    return computeIncome12m(st.txns, Object.assign({}, DATA.meta.importer, st.rules), "本会话流水实时计算");
+  };
+  const getSpend = () => { const v = parseFloat(q("#spendAdj").value); return isFinite(v) && v >= 0 ? v : 0; };
+  const refreshIncome = () => {
+    INC = incomeFromTxns() || (DATA.income ? Object.assign({ src: "数据包" }, DATA.income) : null);
+    const sp = getSpend();
+    DATA.meta.calculator.fields.spend = sp;
+    if (DATA.income) DATA.income.monthlyExpense = sp;
+    try { sessionStorage.setItem("FRI_SPEND", JSON.stringify(sp)); } catch(e){}
+    if (INC) {
+      q("#incC1").innerHTML = "口径一 · 月均收入（含奖金摊平）：<b>" + fmt(INC.monthlyAvg) + "</b> 元/月" + (INC.window ? "　<span class=\"hint\">" + INC.window + "</span>" : "");
+      q("#incC2").innerHTML = "口径二 · 月结余：<b>" + fmt(INC.monthlyAvg - sp) + "</b> 元/月 = 收入 − 每月支出";
+      q("#incSrc").textContent = "来源：" + (INC.src || "数据包") + (INC.salary !== undefined ? " ｜ 工资 " + fmt(INC.salary) + " + 年终奖 " + fmt(INC.bonus) + " + 补贴 " + fmt(INC.subsidy) + " = " + fmt(INC.total) + " / 12 个月" : "");
+    } else {
+      q("#incC1").textContent = "口径一 · 月均收入：—（导入流水或数据包后自动计算）";
+      q("#incC2").textContent = "口径二 · 月结余：—";
+      q("#incSrc").textContent = "";
+    }
+    window.__INCOME = INC ? { avg12m: +INC.monthlyAvg.toFixed(2), surplus: +(INC.monthlyAvg - sp).toFixed(2) } : null;
+  };
+  q("#spendAdj").addEventListener("input", refreshIncome);
+  /* 支出默认值：会话内调整过 → 用调整值；否则用数据包/计划默认 */
+  (function initSpend(){
+    let sp = null;
+    try { const raw = sessionStorage.getItem("FRI_SPEND"); if (raw !== null) sp = JSON.parse(raw); } catch(e){}
+    if (sp === null || !isFinite(sp) || sp < 0) sp = (DATA.income && isFinite(DATA.income.monthlyExpense)) ? DATA.income.monthlyExpense : m.calculator.fields.spend;
+    q("#spendAdj").value = sp;
+  })();
+  refreshIncome();
+
+  const readRules = () => ({
+    employer: q("#impEmployer").value.trim() || imp.employer,
+    salaryAbstract: imp.salaryAbstract,
+    subsidyKeywords: q("#impSubsidy").value.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+    skipTypes: imp.skipTypes,
+    bonusMin: parseFloat(q("#impBonus").value) || imp.bonusMin,
+    bigExpenseMin: parseFloat(q("#impBig").value) || imp.bigExpenseMin
+  });
+  const showPreview = (txns, rules) => {
+    const ag = aggregate(txns, rules);
+    const blocks = buildImportBlocks(ag, rules);
+    lastTxns = txns; lastRules = rules;
+    q("#impStatus").textContent = `解析出 ${txns.length} 笔（${blocks.span}）`;
+    const prev = q("#impPreview");
+    prev.innerHTML = "";
+    const pv = el("details", "sub");
+    pv.appendChild(el("summary", "", "解析预览（将写入 2.1 / 2.2 / 2.3）<span class=\"chev\">▼</span>"));
+    const pb = el("div", "sub-body");
+    renderBlocks(pb, [...blocks.b21, ...blocks.b22, ...blocks.b23]);
+    pv.appendChild(pb); prev.appendChild(pv);
+  };
+  q("#impParse").addEventListener("click", () => {
+    const text = q("#impText").value;
+    const txns = parseStmtText(text);
+    if (!txns.length) {
+      alert("未解析到流水行（0 笔）。\n\n常见原因：\n· 这份 PDF/文本不是「个人客户交易清单」明细格式\n· 复制时只选了表头或汇总页\n\n请确认粘贴的内容里有形如「1 2024-05-15 12:00:00 代发工资 C 15248.00 …」的明细行。");
+      q("#impStatus").textContent = "未解析到流水行（0 笔）。";
+      return;
+    }
+    showPreview(txns, readRules());
+  });
+  file.addEventListener("change", async () => {
+    const files = [...(file.files || [])];
+    if (!files.length) return;
+    const parts = [];
+    for (const f of files) {
+      if (/\.pdf$/i.test(f.name)) {
+        try {
+          parts.push(await extractPdfText(await f.arrayBuffer()));
+        } catch (e) {
+          q("#impStatus").textContent = "PDF 解析失败：" + e.message;
+          return;
+        }
+      } else {
+        parts.push(await f.text());
+      }
+    }
+    const text = parts.join("\n");
+    q("#impText").value = text;
+    const txns = parseStmtText(text);
+    if (!txns.length) {
+      alert("文件里未解析到流水行（0 笔）。若这是其他银行的流水，欢迎按 docs/IMPORT.md 贡献格式；交行 PDF 请确认包含明细页。");
+      q("#impStatus").textContent = "文件里未解析到流水行。";
+      return;
+    }
+    showPreview(txns, readRules());
+  });
+  q("#impApply").addEventListener("click", () => {
+    if (!lastTxns) {
+      alert("请先完成两步：\n1. 选择/粘贴流水后点「🔍 解析并预览」\n2. 预览确认无误后再点「✅ 应用到分析页」");
+      return;
+    }
+    const ag = aggregate(lastTxns, lastRules);
+    try { sessionStorage.setItem("FRI_TXNS_V1", JSON.stringify({ rules: lastRules, txns: lastTxns })); } catch(e){}
+    q("#impStatus").textContent = "✅ 已应用（分析页自动同步）。";
+    alert("✅ 流水已应用到「🔎 分析」页：共 " + lastTxns.length.toLocaleString() + " 笔（" + ag.dMin + " ~ " + ag.dMax + "）。\n切换到「🔎 分析」Tab 即可查看；「导出备份 JSON」也会一并包含。");
+  });
+  q("#impClear").addEventListener("click", () => {
+    sessionStorage.removeItem(LS_KEY);
+    q("#impStatus").textContent = "已清除本次解析的流水（关闭标签页同样会自动清空）。";
+    q("#impPreview").innerHTML = "";
+  });
+
+  /* 挂载 + 会话恢复（挂载后执行，作用域内可访问局部状态） */
+  document.getElementById("host").appendChild(d);
+  (function(){
+    try {
+      const raw = sessionStorage.getItem("FRI_TXNS_V1");
+      if (!raw) return;
+      const st = JSON.parse(raw);
+      if (st.txns && st.txns.length) {
+        lastTxns = st.txns; lastRules = Object.assign({}, DATA.meta.importer, st.rules);
+        const ag = aggregate(st.txns, lastRules);
+        const blocks = buildImportBlocks(ag, lastRules);
+        q("#impStatus").textContent = "已载入 " + st.txns.length + " 笔（" + blocks.span + "）——「分析」页已同步。";
+      }
+    } catch(e){}
+  })();
+  return d;
+}
+/* 挂载导入面板（此前缺失调用，导致面板从未出现） */
+document.getElementById("host").appendChild(buildImporter());
+</script>
 </body>
 </html>
