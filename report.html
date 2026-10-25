@@ -425,7 +425,7 @@ const DATA = {
       tip: "按计划口径预填月支出/房租（示例值，在 DATA.meta.calculator.fields 修改）"
     },
     importer: {
-      employer: "示例科技",
+      employer: "",
       salaryAbstract: "工资",
       subsidyKeywords: ["Employee Payment", "报销"],
       skipTypes: ["活期盈", "退款", "利息", "赎回", "理财", "证转银", "银转证"],
@@ -990,7 +990,7 @@ function parseStmtText(text){
 }
 function classifyTxn(txn, r){
   if (r.skipTypes.some(k => txn.t.includes(k))) return null;
-  if (!txn.rest.includes(r.employer)) return null;
+  if (r.employer && !txn.rest.includes(r.employer)) return null;
   if (r.subsidyKeywords.some(k => txn.rest.includes(k))) return "sub";
   if (txn.rest.includes(r.salaryAbstract)) return txn.amt >= r.bonusMin ? "bonus" : "salary";
   return "other";
@@ -1086,7 +1086,12 @@ function applyImport(txns, rules, save){
   setB("sec-2-2", blocks.b22, "2.2 收入结构");
   setB("sec-2-3", blocks.b23, "2.3 大额支出（Top 20）");
   boot();
+  /* 强反馈：展开刚写入的三节并定位到 2.1，否则折叠状态下看不出变化 */
+  ["sec-2-1", "sec-2-2", "sec-2-3"].forEach(id => { const x = document.getElementById(id); if (x) x.open = true; });
+  const target = document.getElementById("sec-2-1");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
   if (save !== false) { try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
+  return ag;
 }
 function loadStoredImport(){
   try {
@@ -1177,7 +1182,7 @@ function buildImporter(){
     inp.style.cssText = `border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;width:${w || 150}px;background:#fff;`;
     dv.appendChild(inp); return dv;
   };
-  grid.appendChild(field("雇主户名关键词", "impEmployer", imp.employer, "text", 160));
+  grid.appendChild(field("雇主户名关键词（留空 = 不限雇主）", "impEmployer", imp.employer, "text", 160));
   grid.appendChild(field("补贴摘要关键词（逗号分隔）", "impSubsidy", imp.subsidyKeywords.join(","), "text", 200));
   grid.appendChild(field("奖金判定下限（元）", "impBonus", imp.bonusMin, "number", 120));
   grid.appendChild(field("大额支出阈值（元）", "impBig", imp.bigExpenseMin, "number", 120));
@@ -1283,7 +1288,11 @@ function buildImporter(){
   q("#impParse").addEventListener("click", () => {
     const text = q("#impText").value;
     const txns = parseStmtText(text);
-    if (!txns.length) { q("#impStatus").textContent = "未解析到流水行——请确认粘贴的是流水清单全文（含表头后的明细行）。"; return; }
+    if (!txns.length) {
+      alert("未解析到流水行（0 笔）。\n\n常见原因：\n· 这份 PDF/文本不是「个人客户交易清单」明细格式\n· 复制时只选了表头或汇总页\n\n请确认粘贴的内容里有形如「1 2024-05-15 12:00:00 代发工资 C 15248.00 …」的明细行。");
+      q("#impStatus").textContent = "未解析到流水行（0 笔）。";
+      return;
+    }
     showPreview(txns, readRules());
   });
   file.addEventListener("change", async () => {
@@ -1305,12 +1314,20 @@ function buildImporter(){
     const text = parts.join("\n");
     q("#impText").value = text;
     const txns = parseStmtText(text);
-    if (!txns.length) { q("#impStatus").textContent = "文件里未解析到流水行。"; return; }
+    if (!txns.length) {
+      alert("文件里未解析到流水行（0 笔）。若这是其他银行的流水，欢迎按 docs/IMPORT.md 贡献格式；交行 PDF 请确认包含明细页。");
+      q("#impStatus").textContent = "文件里未解析到流水行。";
+      return;
+    }
     showPreview(txns, readRules());
   });
   q("#impApply").addEventListener("click", () => {
-    if (!lastTxns) { q("#impStatus").textContent = "请先「解析并预览」。"; return; }
-    applyImport(lastTxns, lastRules, true);
+    if (!lastTxns) {
+      alert("请先完成两步：\n1. 选择/粘贴流水后点「🔍 解析并预览」\n2. 预览确认无误后再点「✅ 应用到报告」");
+      return;
+    }
+    const ag = applyImport(lastTxns, lastRules, true);
+    alert("✅ 已应用到报告：共 " + lastTxns.length.toLocaleString() + " 笔（" + ag.dMin + " ~ " + ag.dMax + "）\n\n已写入并展开：2.1 流水概况 ｜ 2.2 收入结构 ｜ 2.3 大额支出\n页面已定位到 2.1，Hero 的「统计维度」也同步更新。");
   });
   q("#impClear").addEventListener("click", () => {
     sessionStorage.removeItem(LS_KEY);
