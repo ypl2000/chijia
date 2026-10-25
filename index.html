@@ -126,7 +126,7 @@
       <div class="s-body">
         <div class="s-t">上传银行流水（凭证）</div>
         <div class="s-d">选择流水 PDF（内置交通银行·个人客户交易清单格式），自动生成流水概况、收入结构（含近 12 个月平均收入与补贴统计）和大额支出。也支持复制粘贴，全程本地解析。</div>
-        <button class="gobtn" data-go="report:import">📥 去导入流水</button>
+        <button class="gobtn" data-go="settings">📥 去导入流水</button>
       </div>
     </div>
 
@@ -134,9 +134,9 @@
       <div class="s-no">2</div>
       <div class="s-body">
         <div class="s-t">调整计划参数（账本）</div>
-        <div class="s-d">计划月数、每月定投 / 安全垫 / ESOP 预备、一次性收支（还债、车险、年终奖……）都能改——改完第一部分计划与预期分布自动重算。</div>
+        <div class="s-d">计划月数、每月定投 / 安全垫 / ESOP 预备、一次性收支（还债、车险、年终奖……）都能改——改完第一部分计划与预期分布自动重算。每月支出在「设置」页的③收入口径处调整。</div>
         <button class="gobtn" data-go="report:plan">🎛 去调参数</button>
-        <button class="gobtn ghost" data-go="report:income">💰 看收入口径</button>
+        <button class="gobtn ghost" data-go="settings">💰 看收入口径</button>
       </div>
     </div>
 
@@ -163,16 +163,12 @@
       <b>数据规则：</b><b>数据包 JSON 是账本（主数据源）</b>，流水 PDF 是<b>凭证（补充输入）</b>，两者都只在当前标签页会话里——<b>关闭浏览器自动清空</b>。长期保留用各面板里的「导出备份 JSON」，换设备恢复也靠它。
     </div>
 
-    <div class="entries">
-      <div class="entry" data-go="report"><span class="e-ico">📋</span><span class="e-t">资金计划</span><span class="e-d">分析与推演</span></div>
-      <div class="entry" data-go="calculator"><span class="e-ico">🧮</span><span class="e-t">FIRE 计算器</span><span class="e-d">三档模型</span></div>
-      <div class="entry" data-go="portfolio"><span class="e-ico">🧪</span><span class="e-t">组合体检</span><span class="e-d">四维红绿灯</span></div>
-    </div>
   </div>
 
   <iframe id="view-report" title="资金计划" src="./report.html?app=1"></iframe>
   <iframe id="view-calculator" title="财富自由计算器"></iframe>
   <iframe id="view-portfolio" title="组合体检"></iframe>
+  <iframe id="view-settings" title="设置"></iframe>
 </div>
 
 <nav class="tabs">
@@ -180,6 +176,7 @@
   <button data-view="report"><span class="ico">📋</span>计划</button>
   <button data-view="calculator"><span class="ico">🧮</span>计算器</button>
   <button data-view="portfolio"><span class="ico">🧪</span>体检</button>
+  <button data-view="settings"><span class="ico">⚙️</span>设置</button>
 </nav>
 
 <script>
@@ -187,12 +184,14 @@
 const VIEWS = {
   report:     { file: "./report.html?app=1" },
   calculator: { file: "./calculator.html?app=1" },
-  portfolio:  { file: "./portfolio.html?app=1" }
+  portfolio:  { file: "./portfolio.html?app=1" },
+  settings:   { file: "./settings.html?app=1" }
 };
 const iframes = {
   report: document.getElementById("view-report"),
   calculator: document.getElementById("view-calculator"),
-  portfolio: document.getElementById("view-portfolio")
+  portfolio: document.getElementById("view-portfolio"),
+  settings: document.getElementById("view-settings")
 };
 
 function activate(name){

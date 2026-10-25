@@ -1423,8 +1423,12 @@ function applyPlan(p, save){
   });
 
   boot();
-  ["sec-1-1", "sec-1-2", "sec-1-3", "sec-1-4"].forEach(id => { const x = document.getElementById(id); if (x) x.open = true; });
-  const t = document.getElementById("sec-1-1"); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!document.body.classList.contains("settings-mode")) {
+    ["sec-1-1", "sec-1-2", "sec-1-3", "sec-1-4"].forEach(id => { const x = document.getElementById(id); if (x) x.open = true; });
+  }
+  if (!document.body.classList.contains("settings-mode")) {
+    const t = document.getElementById("sec-1-1"); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   if (save !== false) { try { sessionStorage.setItem("FRI_PLAN", JSON.stringify(p)); } catch(e){} }
   return eng;
 }

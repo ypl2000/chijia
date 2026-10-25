@@ -707,9 +707,9 @@ recalc();
   if (!applied.length) return;
   recalc();
   const bar = document.createElement('div');
-  bar.style.cssText = 'margin:10px 0 0;padding:9px 14px;border:1px dashed var(--blue);border-radius:10px;font-size:13px;background:#f2f7ff;';
+  bar.style.cssText = 'margin:10px 0 0;padding:9px 14px;border:1px dashed var(--blue);border-radius:10px;font-size:13px;background:#f2f7ff;color:#1c2333;';
   bar.innerHTML = '🧮 已从《' + (pre.label || '资金报告') + '》导入参数：' +
-    applied.join(' / ') + ' —— <a href="#" id="ffcReset" style="color:var(--blue)">恢复默认</a>';
+    applied.join(' / ') + ' —— <a href="#" id="ffcReset" style="color:#2f6fed">恢复默认</a>';
   document.querySelector('main').prepend(bar);
   bar.querySelector('#ffcReset').addEventListener('click', e => {
     e.preventDefault();
