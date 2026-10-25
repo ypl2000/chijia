@@ -191,7 +191,7 @@
 </main>
 
 <footer>
-  持家 chijia · 组合体检 ｜ 与 <a href="report.html">资金报告</a>、<a href="calculator.html">财富自由计算器</a> 组成三件套<br>
+  持家 chijia · 组合体检（构建 v1.1 · 2026-10-25c）｜ 与 <a href="report.html">资金报告</a>、<a href="calculator.html">财富自由计算器</a> 组成三件套<br>
   预期收益为长期历史量级的名义假设，不构成任何收益承诺或投资建议 ｜ 所有计算本地完成
 </footer>
 
@@ -314,35 +314,38 @@ function recalc(){
     ? "<b>不计入组合：</b>" + others.join("；") + "。它们影响总资产观感，但不产生可自由使用的 4%。"
     : "没有消费类/限用途资产需要排除。";
 
-  /* 建议：红→黄排序，金额化，最多 4 条 */
+  /* 建议：大白话 + 具体动作，红→黄排序，最多 4 条 */
   const sug = [];
   if (c.esopShare > 0.2) {
     const cap = 0.2 * c.income, excess = s.esop - cap;
-    sug.push({ lv: c.esopShare > 0.4 ? 0 : 1, t: "🔴 公司股权超上限：占生息组合 " + pct(c.esopShare) + "，超出 " + fmt(excess) + " 元。立即停止新增流入——分红、奖金、认购款不再进入该桶。" });
+    sug.push({ lv: c.esopShare > 0.4 ? 0 : 1, t: '<b>公司股份（ESOP）建议停止配置</b>：现在占生息组合 ' + pct(c.esopShare) + '（安全线 20%），多出约 <b>' + fmt(excess) + ' 元</b>。具体做法：今年的认购不再买；ESOP 分红和奖金到账后，直接买入指数基金，不再回填 ESOP。' });
   }
   if (s.monthlyExpense > 0 && c.liqMonths < 6) {
     const gap = 6 * s.monthlyExpense - c.liq;
-    sug.push({ lv: c.liqMonths < 3 ? 0 : 1, t: (c.liqMonths < 3 ? "🔴" : "🟡") + " 流动性缺口 " + fmt(gap) + " 元：先补足现金/稳健类至 6 个月支出（" + fmt(6 * s.monthlyExpense) + " 元），这是组合的安全气垫。" });
+    sug.push({ lv: c.liqMonths < 3 ? 0 : 1, t: (c.liqMonths < 3 ? '<b>先把应急钱补够</b>' : '建议补应急钱') + '：现金+稳健类要够 6 个月生活费（约 <b>' + fmt(6 * s.monthlyExpense) + ' 元</b>），现在只有 ' + fmt(c.liq) + ' 元，还差 <b>' + fmt(gap) + ' 元</b>——放货币基金或活期理财，随取随用。' });
   }
   if (c.income > 0) {
     const lo = c.band[0], hi = c.band[1], share = c.equityShare * 100;
     if (share < lo) {
       const gap = lo / 100 * c.income - (s.equity + s.esop);
       const months = s.monthlyInvest > 0 ? Math.ceil(gap / s.monthlyInvest) : null;
-      sug.push({ lv: off_level(share, c.band), t: (off_level(share, c.band) === 0 ? "🔴" : "🟡") + " 权益类缺口 " + fmt(gap) + " 元" + (months ? "：按每月投入 " + fmt(s.monthlyInvest) + " 元，约 " + months + " 个月补齐（宽基指数/红利类）。" : "。") });
+      sug.push({ lv: off_level(share, c.band), t: (off_level(share, c.band) === 0 ? '<b>权益类严重不足，建议多配置指数基金</b>' : '建议多配置宽基指数基金') + '（沪深300、中证红利这一类）：距离目标下限还差约 <b>' + fmt(gap) + ' 元</b>' + (months ? '。按每月投 ' + fmt(s.monthlyInvest) + ' 元，大约 <b>' + months + ' 个月</b>补齐。' : '。') });
     } else if (share > hi) {
       const excess = (s.equity + s.esop) - hi / 100 * c.income;
-      sug.push({ lv: off_level(share, c.band), t: "🟡 权益超配比上限：超出 " + fmt(excess) + " 元。新增现金流优先补现金/稳健类，不再加权益。" });
+      sug.push({ lv: off_level(share, c.band), t: '<b>权益类建议暂停配置</b>（指数基金 + 公司股份合计超出目标上限约 <b>' + fmt(excess) + ' 元</b>）：定投先停，新钱转放货币基金。' });
     }
   }
   if (c.rEff !== null && c.rEff < s.modelR / 100) {
-    sug.push({ lv: (s.modelR / 100 - c.rEff) * 100 > 1 ? 0 : 1, t: "🟡 收益与假设不匹配：组合有效收益 " + pct(c.rEff) + " < 模型 " + s.modelR.toFixed(1) + "%。二选一：按建议调仓；或把财富自由计算器的收益率 r 下调至 " + (c.rEff * 100).toFixed(1) + "% 重算本金需求（所需本会增加）。" });
+    sug.push({ lv: (s.modelR / 100 - c.rEff) * 100 > 1 ? 0 : 1, t: '<b>这套组合撑不起 ' + s.modelR.toFixed(1) + '% 的假设</b>：有效收益只有 ' + pct(c.rEff) + '。二选一：按上面调整持仓；或把财富自由计算器里的「收益率 r」改成 <b>' + (c.rEff * 100).toFixed(1) + '%</b>，重新算需要多少本金。' });
   }
   sug.sort((a, b) => a.lv - b.lv);
   const list = $("suggList");
   list.innerHTML = "";
   if (!sug.length) list.innerHTML = "<li>✅ 没有需要调整的——四个维度全部合格。保持纪律即可。</li>";
-  else sug.slice(0, 4).forEach(x => { const li = document["createElement"]("li"); li.textContent = x.t; list.appendChild(li); });
+  else sug.slice(0, 4).forEach(x => { const li = document["createElement"]("li"); li.innerHTML = x.t; list.appendChild(li); });
+
+  /* 记住持仓与参数（存本浏览器；「清空」或重置会一并删除） */
+  try { localStorage.setItem("FRI_PF_HOLDINGS", JSON.stringify(s)); } catch(e){}
 
   function off_level(share, band){ const off = share < band[0] ? band[0] - share : share - band[1]; return off > 10 ? 0 : 1; }
 }
@@ -364,13 +367,25 @@ function tryPrefill(silent){
 $("fromReport").addEventListener("click", () => tryPrefill(false));
 $("clearAll").addEventListener("click", () => {
   BUCKETS.forEach(b => $(b.key).value = 0);
-  $("srcStatus").textContent = "";
+  try { localStorage.removeItem("FRI_PF_HOLDINGS"); } catch(e){}
+  $("srcStatus").textContent = "已清空（记忆已删除）";
   recalc();
 });
 ["equity","bond","cash","esop","consumer","restricted","equityR","bondR","cashR","esopR","years","modelR","monthlyExpense","monthlyInvest"]
   .forEach(id => $(id).addEventListener("input", recalc));
 
-/* 启动：先尝试静默预填，再算一次 */
+/* 启动：先恢复上次记忆的持仓与参数，再让报告预填（若有）覆盖桶金额，最后计算 */
+(function restoreHoldings(){
+  try {
+    const raw = localStorage.getItem("FRI_PF_HOLDINGS");
+    if (!raw) return;
+    const sv = JSON.parse(raw);
+    BUCKETS.forEach(b => { if (isFinite(sv[b.key])) $(b.key).value = sv[b.key]; });
+    [["equityR","equityR"],["bondR","bondR"],["cashR","cashR"],["esopR","esopR"],["years","years"],["modelR","modelR"],["monthlyExpense","monthlyExpense"],["monthlyInvest","monthlyInvest"]]
+      .forEach(([k]) => { if (isFinite(sv[k])) $(k).value = sv[k]; });
+    $("srcStatus").textContent = "已恢复上次输入（存本浏览器，「🧹 清空」可删除）";
+  } catch(e){}
+})();
 tryPrefill(true);
 recalc();
 </script>
