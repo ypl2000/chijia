@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人财务分析与资金计划（通用模板）</title>
+<style>
+  :root{
+    --ink:#1c2333;
+    --sub:#5a6478;
+    --line:#e6e9f0;
+    --bg:#f4f6fa;
+    --card:#ffffff;
+    --blue:#2f6fed;
+    --blue-soft:#e8effd;
+    --green:#0f9d6e;
+    --green-soft:#e3f5ee;
+    --orange:#e8871e;
+    --orange-soft:#fdf0df;
+    --gray-soft:#eef0f4;
+    --red:#d64541;
+    --red-soft:#fceceb;
+    --gold:#e8a13a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.65;
+  }
+
+  /* ===== 悬浮大类导航 ===== */
+  .fab{
+    position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:6px;padding:10px 8px;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:16px;
+    box-shadow:0 10px 30px rgba(28,35,51,.15);
+  }
+  .fab .brand{
+    text-align:center;font-size:12px;font-weight:800;color:var(--sub);
+    padding:0 0 6px;border-bottom:1px solid var(--line);margin-bottom:4px;letter-spacing:2px;
+  }
+  .fab a{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    width:78px;padding:8px 4px;border-radius:11px;
+    text-decoration:none;color:var(--ink);transition:.15s;
+  }
+  .fab a .ico{
+    width:26px;height:26px;border-radius:8px;background:var(--blue-soft);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+  }
+  .fab a .lab{font-size:11.5px;line-height:1.2;}
+  .fab a:hover{background:var(--blue-soft);}
+  .fab a.active{background:var(--blue);color:#fff;}
+  .fab a.active .ico{background:rgba(255,255,255,.25);color:#fff;}
+  .fab a.top .ico{background:var(--gray-soft);color:var(--sub);}
+
+  /* ===== 正文 ===== */
+  .content{max-width:1240px;margin:0 auto;padding:26px clamp(16px,3vw,44px) 60px;}
+  @media (max-width:1520px){
+    .content{margin:0 20px 0 104px;max-width:none;}
+  }
+
+  .hero{
+    background:linear-gradient(135deg,#22315c 0%,#2f6fed 100%);
+    border-radius:16px;color:#fff;padding:30px 30px 26px;margin-bottom:16px;
+  }
+  .hero h1{font-size:24px;letter-spacing:.5px;font-weight:700;}
+  .hero p.sub{opacity:.85;margin-top:6px;font-size:14px;}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;}
+  .chip{
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+    border-radius:999px;padding:6px 15px;font-size:13px;
+  }
+  .chip b{font-size:14.5px;}
+  .chip.dim{background:rgba(255,255,255,.08);border-style:dashed;}
+  .stat-split{display:grid;grid-template-columns:1fr 34px 1fr;align-items:stretch;gap:0;margin-top:14px;}
+  .stat-side{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:12px 16px;}
+  .stat-side.now{border-left:4px solid #8fd3ff;}
+  .stat-side.exp{border-left:4px solid #ffd58a;}
+  .stat-side .ss-head{font-size:12.5px;letter-spacing:.5px;opacity:.85;margin-bottom:8px;font-weight:700;}
+  .stat-side .ss-items{display:flex;flex-wrap:wrap;gap:6px 22px;}
+  .stat-side .ss-item{display:flex;flex-direction:column;gap:1px;min-width:110px;}
+  .stat-side .ss-item span{font-size:12px;opacity:.8;}
+  .stat-side .ss-item b{font-size:16px;font-variant-numeric:tabular-nums;}
+  .stat-arrow{display:flex;align-items:center;justify-content:center;font-size:20px;opacity:.9;}
+
+  /* ===== Part banner ===== */
+  .part{margin:26px 0 14px;display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--ink);padding-bottom:10px;}
+  .part .no{
+    font-size:12.5px;font-weight:700;color:#fff;background:var(--ink);
+    border-radius:8px;padding:4px 12px;white-space:nowrap;
+  }
+  .part h2{font-size:21px;font-weight:800;letter-spacing:1px;}
+  .part .pnote{margin-left:auto;color:var(--sub);font-size:12.5px;}
+
+  /* ===== 可折叠卡片 ===== */
+  details.sec{
+    background:var(--card);border-radius:14px;margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(28,35,51,.06);overflow:hidden;scroll-margin-top:16px;
+  }
+  details.sec > summary{
+    cursor:pointer;list-style:none;user-select:none;
+    display:flex;align-items:center;gap:11px;
+    padding:15px 22px;font-size:15.5px;font-weight:700;transition:background .15s;
+  }
+  details.sec > summary::-webkit-details-marker{display:none;}
+  details.sec > summary::before{
+    content:"";width:5px;height:17px;border-radius:3px;background:var(--blue);flex:0 0 auto;
+  }
+  details.sec > summary:hover{background:#f7f9fd;}
+  details.sec > summary .chev{
+    margin-left:auto;color:var(--sub);font-size:12px;transition:transform .2s;
+  }
+  details.sec[open] > summary .chev{transform:rotate(180deg);}
+  details.sec:not([open]) > summary .chev{transform:rotate(-90deg);}
+  .sec-body{padding:2px 24px 24px;}
+
+  /* ===== 嵌套折叠块 ===== */
+  details.sub{
+    border:1px solid var(--line);border-left:3px solid var(--blue);
+    border-radius:10px;background:#fbfcfe;margin:16px 0;
+  }
+  details.sub > summary{
+    cursor:pointer;list-style:none;user-select:none;
+    padding:11px 14px;font-size:13.5px;font-weight:600;
+    display:flex;align-items:center;gap:8px;
+  }
+  details.sub > summary::-webkit-details-marker{display:none;}
+  details.sub > summary .chev{margin-left:auto;font-size:11px;color:var(--sub);transition:transform .2s;}
+  details.sub[open] > summary .chev{transform:rotate(180deg);}
+  details.sub:not([open]) > summary .chev{transform:rotate(-90deg);}
+  details.sub > summary:hover{color:var(--blue);}
+  .sub-body{padding:2px 16px 16px;}
+
+  .sec-sub{color:var(--sub);font-size:13.5px;margin-bottom:16px;}
+  h4{font-size:14px;margin:16px 0 8px;color:var(--ink);font-weight:700;}
+  h4 .hint{font-weight:400;color:var(--sub);font-size:12.5px;}
+
+  /* ===== Tables ===== */
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{
+    background:#f0f3f9;color:var(--sub);font-weight:600;text-align:left;
+    padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap;
+  }
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  tr.total td{background:#f7f9fd;font-weight:700;}
+  .tbl-wrap{overflow-x:auto;}
+  tr.hl-green td{background:var(--green-soft);}
+  tr.hl-orange td{background:var(--orange-soft);}
+  tr.hl-red td{background:var(--red-soft);}
+  tr.hl-blue td{background:var(--blue-soft);}
+  .tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap;}
+  .tag-green{background:var(--green-soft);color:var(--green);}
+  .tag-blue{background:var(--blue-soft);color:var(--blue);}
+  .tag-orange{background:var(--orange-soft);color:#c06e10;}
+  .tag-red{background:var(--red-soft);color:var(--red);}
+  .tag-gray{background:var(--gray-soft);color:var(--sub);}
+  .muted{color:var(--sub);}
+  .done{font-weight:700;color:var(--green);}
+  .neg{color:var(--red);font-weight:600;}
+  .arw{color:var(--blue);font-weight:800;}
+
+  /* ===== Callout ===== */
+  .callout{
+    background:var(--blue-soft);border-radius:10px;padding:14px 18px;font-size:13.5px;
+    color:#28457e;margin-top:14px;
+  }
+  .callout b{color:var(--blue);}
+  .callout.ok{background:var(--green-soft);color:#14614a;}
+  .callout.ok b{color:var(--green);}
+  .callout.warn{background:var(--orange-soft);color:#8a5a10;}
+  .callout.warn b{color:#c06e10;}
+
+  /* ===== Bullets ===== */
+  ul.dotlist{padding-left:0;list-style:none;}
+  ul.dotlist li{position:relative;padding-left:20px;margin:7px 0;font-size:14px;}
+  ul.dotlist li::before{
+    content:"";position:absolute;left:2px;top:11px;width:7px;height:7px;border-radius:50%;background:var(--blue);
+  }
+
+  /* ===== 置顶：资金分布对比 ===== */
+  .dist-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch;margin-top:6px;}
+  .dist-card{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;}
+  .dist-card .dc-head{font-size:13px;color:var(--sub);font-weight:600;}
+  .dist-card .dc-total{font-size:20px;font-weight:800;margin:2px 0 12px;}
+  .dist-card.now{border-top:4px solid var(--orange);}
+  .dist-card.exp{border-top:4px solid var(--green);}
+  .dist-arrow{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;min-width:130px;padding:0 4px;
+  }
+  .dist-arrow .big{font-size:36px;color:var(--blue);font-weight:800;line-height:1;}
+  .dist-arrow .cap{
+    font-size:12px;color:#28457e;text-align:center;
+    background:var(--blue-soft);border-radius:8px;padding:6px 10px;line-height:1.5;
+  }
+  .dstack{display:flex;border-radius:9px;overflow:hidden;height:26px;margin:6px 0 12px;font-size:11.5px;color:#fff;}
+  .dstack div{display:flex;align-items:center;justify-content:center;white-space:nowrap;min-width:0;}
+  .drow{display:flex;align-items:center;gap:8px;font-size:13px;margin:7px 0;}
+  .drow .nm{flex:0 0 128px;display:flex;align-items:center;gap:6px;}
+  .drow .dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;}
+  .drow .amt{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .drow .pc2{flex:0 0 52px;text-align:right;color:var(--sub);white-space:nowrap;}
+  @media (max-width:860px){
+    .dist-grid{grid-template-columns:1fr;}
+    .dist-arrow{flex-direction:row;padding:2px 0;}
+    .dist-arrow .big{font-size:28px;}
+    .dist-arrow .cap{text-align:left;}
+  }
+
+  /* ===== 图形化：流程链 ===== */
+  .flow{display:flex;align-items:stretch;flex-wrap:wrap;gap:6px;}
+  .flow .step{
+    flex:1;min-width:130px;background:#fbfcfe;border:1px solid var(--line);
+    border-radius:12px;padding:12px 10px;text-align:center;
+  }
+  .flow .step .t{font-size:13.5px;font-weight:700;}
+  .flow .step .d{font-size:12px;color:var(--sub);margin-top:3px;}
+  .flow .arrow{
+    align-self:center;color:var(--blue);font-weight:800;font-size:16px;padding:0 2px;flex:0 0 auto;
+  }
+
+  /* ===== 图形化：理财梯队 ===== */
+  .tier{display:flex;flex-direction:column;gap:8px;margin:6px 0;}
+  .tier .t-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .tier .t-bar{
+    height:32px;border-radius:8px;display:flex;align-items:center;
+    padding:0 14px;color:#fff;font-size:13px;font-weight:600;white-space:nowrap;
+  }
+  .tier .t-row .tag{margin-left:2px;}
+
+  /* ===== 图形化：资金瀑布 ===== */
+  .wf-line{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 2px;}
+  .wf-node{
+    flex:0 0 auto;min-width:116px;text-align:center;background:#fff;
+    border:1px solid var(--line);border-radius:10px;padding:8px 6px;
+  }
+  .wf-node .d{font-size:11px;color:var(--sub);}
+  .wf-node .a{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;}
+  .wf-node.in .a{color:var(--green);}
+  .wf-node.out .a{color:var(--red);}
+  .wf-node.key{border-color:var(--red);background:var(--red-soft);}
+  .wf-node.key .a{color:var(--red);}
+  .wfa{color:var(--sub);font-size:13px;flex:0 0 auto;padding:0 2px;}
+
+  /* ===== 图形化：画像卡片 ===== */
+  .pic-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px;}
+  .pic-card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fbfcfe;}
+  .pic-card .h{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .pic-card .d{font-size:12.5px;color:var(--sub);margin-top:4px;}
+  @media (max-width:860px){.pic-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:560px){.pic-grid{grid-template-columns:1fr;}}
+  .qbar{background:#eef2f8;border-radius:99px;height:10px;overflow:hidden;}
+  .qbar i{display:block;height:100%;background:linear-gradient(90deg,#5b8bf0,var(--blue));border-radius:99px;}
+
+  /* ===== 图形化：借贷进度 ===== */
+  .loan{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fbfcfe;margin:8px 0;}
+  .loan .loan-head{font-size:13.5px;font-weight:700;}
+  .loan .loan-head b{color:var(--green);}
+  .loan .loan-head .rem{color:var(--red);}
+  .loanbar{height:16px;border-radius:8px;background:var(--gray-soft);overflow:hidden;margin:8px 0;}
+  .loanbar i{display:block;height:100%;width:80%;background:var(--green);border-radius:8px;}
+  .ms{font-size:12.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;}
+  .ms span{background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 9px;}
+
+  /* ===== 图形化：垂直时间线 ===== */
+  .tl{position:relative;padding-left:24px;margin:6px 0;}
+  .tl::before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:2px;background:var(--line);}
+  .tl .tl-item{position:relative;margin:12px 0;}
+  .tl .tl-item::before{
+    content:"";position:absolute;left:-24px;top:7px;width:10px;height:10px;border-radius:50%;
+    background:var(--blue);border:2px solid #fff;box-shadow:0 0 0 2px var(--blue-soft);
+  }
+  .tl .t{font-weight:700;font-size:13.5px;}
+  .tl .d{font-size:13px;color:var(--sub);}
+
+  /* ===== Allocation bar ===== */
+  .allocbar{display:flex;border-radius:10px;overflow:hidden;height:44px;margin:14px 0 10px;font-size:12.5px;color:#fff;}
+  .allocbar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;min-width:0;}
+  .ab-consume{background:#8a93a8;width:24%;}
+  .ab-invest{background:var(--blue);width:24%;}
+  .ab-cushion{background:var(--green);width:20%;}
+  .ab-esop{background:var(--orange);width:32%;}
+
+  /* ===== 投资分布条 ===== */
+  .dist-row2{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:13px;}
+  .dist-row2 .name{flex:0 0 168px;}
+  .dist-row2 .bar{flex:1;height:16px;background:var(--gray-soft);border-radius:8px;overflow:hidden;}
+  .dist-row2 .bar i{display:block;height:100%;border-radius:8px;min-width:4px;}
+  .dist-row2 .pct{flex:0 0 56px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;}
+
+  /* ===== Cards ===== */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:6px;}
+  .pcard{border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .pcard .lab{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:.3px;}
+  .pcard .val{font-size:24px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .pcard .note{font-size:12.5px;color:var(--sub);margin-top:4px;}
+  .pcard.total{background:#22315c;border:none;color:#fff;}
+  .pcard.total .note{color:rgba(255,255,255,.75);}
+  .pcard.total .lab{color:#fff;}
+  .pcard.total .val{color:#fff;}
+
+  /* ===== Pros / Cons ===== */
+  .pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px;}
+  .pc{border-radius:12px;padding:16px 18px;font-size:13.5px;}
+  .pc h4{margin:0 0 8px;font-size:14.5px;}
+  .pc ul{padding-left:18px;}
+  .pc li{margin:5px 0;}
+  .pc.pros{background:var(--green-soft);}
+  .pc.pros h4{color:var(--green);}
+  .pc.cons{background:var(--red-soft);}
+  .pc.cons h4{color:var(--red);}
+  @media (max-width:700px){.pc-grid{grid-template-columns:1fr;}}
+
+  /* ===== Stars ===== */
+  .stars{color:var(--gold);font-weight:700;letter-spacing:2px;white-space:nowrap;}
+  .stars .off{color:#d5dae3;}
+
+  /* ===== Rules ===== */
+  .rule{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line);}
+  .rule:last-child{border-bottom:none;}
+  .rule .no{
+    flex:0 0 30px;height:30px;border-radius:50%;background:var(--blue-soft);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+  }
+  .rule b{display:block;margin-bottom:2px;}
+  .rule p{font-size:13.5px;color:var(--sub);}
+
+  /* ===== Part1 双栏：1.1~1.4 左 · 保护规则右 ===== */
+  .p1-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;}
+  .p1-rules{
+    position:sticky;top:18px;background:var(--card);border-radius:14px;
+    box-shadow:0 1px 3px rgba(28,35,51,.06);padding:16px 20px 8px;
+    border-top:4px solid var(--orange);
+  }
+  .p1-rules h4{margin:0 0 2px;font-size:15px;}
+  .p1-rules .rule p{font-size:13px;line-height:1.65;}
+  @media (max-width:1250px){
+    .p1-grid{grid-template-columns:1fr;}
+    .p1-rules{position:static;}
+  }
+
+  footer{
+    text-align:center;color:var(--sub);font-size:12px;margin-top:8px;
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width:1150px){
+    .fab a .lab{display:none;}
+    .fab a{width:42px;padding:7px 0;}
+  }
+  @media (max-width:700px){
+    .fab{
+      top:auto;bottom:14px;left:50%;transform:translateX(-50%);
+      flex-direction:row;padding:7px 8px;
+    }
+    .fab .brand{display:none;}
+    .content{margin:0;padding:18px 14px 90px;}
+    details.sec{scroll-margin-top:14px;}
+    .hero{padding:22px 18px;}
+    .part .pnote{display:none;}
+    .stat-split{grid-template-columns:1fr;gap:10px;}
+    .stat-arrow{transform:rotate(90deg);height:0;}
+    .stat-side .ss-item{min-width:45%;}
+  }
+  @media print{
+    body{background:#fff;}
+    .fab{display:none;}
+    .content{padding:0;max-width:none;}
+    section,.hero,details.sec{box-shadow:none;border:1px solid var(--line);}
+  }
+</style><style>
+  .ffc-btn{
+    background:rgba(255,255,255,.92);color:#22315c;border:1px solid rgba(255,255,255,.6);
+    border-radius:999px;padding:8px 18px;font-size:13.5px;font-weight:700;cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);transition:.15s;
+  }
+  .ffc-btn:hover{background:#fff;transform:translateY(-1px);}
+  .ffc-tip{font-size:12px;opacity:.85;}
+</style></head>
+<body id="top">
+
+<!-- ============ 悬浮大类导航（渲染生成） ============ -->
+<nav class="fab" aria-label="部分导航" id="fab"></nav>
+
+<main class="content">
+
+  <!-- ============ HERO（渲染生成） ============ -->
+  <div class="hero" id="heroBox"></div>
+
+  <!-- ============ 使用说明（渲染生成） ============ -->
+  <div id="guideBox"></div>
+
+  <!-- ============ 置顶：资金分布&计划总览（渲染生成） ============ -->
+  <div id="overviewBox"></div>
+
+  <!-- ============ 各大部分（渲染生成） ============ -->
+  <div id="partsBox"></div>
+
+  <footer id="footBox"></footer>
+</main>
+
+<script>
+/* =====================================================================
+   DATA —— 整份报告的全部数据都集中在这里（通用模板：当前为示例数据）。
+   换成自己的数据：直接改下面每个字段；或用第二部分的「流水导入」自动生成流水分析。
+   所有带【示例】标记的内容都应替换；示例数字彼此自洽，可直接看版式效果。
+   ===================================================================== */
+const DATA = {
+
+  meta: {
+    title: "个人财务分析与资金计划",
+    subtitle: "【示例数据】把真实数据填入本文件的 DATA 对象，或在第二部分「流水导入」自动解析 ｜ 所有计算均在浏览器本地完成，不上传任何数据",
+    statsDim: { label: "统计维度", text: "流水 1,234 笔 · 24 个月" },
+    footer: "口径：月收入 18,000（示例）｜ 金额单位：人民币元 · 仅为个人资金安排参考，不构成投资建议",
+    calculator: {
+      file: "财富自由计算器.html",
+      btn: "🧮 发送到财富自由计算器",
+      label: "资金报告-通用版",
+      fields: { spend: 6000, rent: 3200 },
+      tip: "按计划口径预填月支出/房租（示例值，在 DATA.meta.calculator.fields 修改）"
+    },
+    importer: {
+      employer: "示例科技",
+      salaryAbstract: "工资",
+      subsidyKeywords: ["Employee Payment", "报销"],
+      skipTypes: ["活期盈", "退款", "利息", "赎回", "理财", "证转银", "银转证"],
+      bonusMin: 50000,
+      bigExpenseMin: 5000
+    }
+  },
+
+  /* ---- Hero：时期左右分栏指标 ---- */
+  hero: {
+    now: { head: "现在 · 【填当期年月】", items: [
+      { label: "当期余额", b: "20,000" },
+      { label: "当前流动资产", b: "≈50,000" },
+      { label: "公积金", b: "60,000" },
+      { label: "当前总资产", b: "≈440,000" },
+      { label: "虚拟股持仓", b: "180,000" }
+    ]},
+    exp: { head: "计划期末 · 【填计划截止日】", items: [
+      { label: "计划期末流动资产", b: "≈132,000" },
+      { label: "计划期末总资产", b: "≈512,000" }
+    ]}
+  },
+
+  /* ---- 使用说明 ---- */
+  guide: {
+    title: "📖 使用说明（通用模板，当前展示的是示例数据）",
+    steps: [
+      "本页全部内容由 <b>DATA 对象</b> 渲染。两种填法：① 点下方「导出/导入我的数据」——数据只存浏览器与 JSON 备份，不改模板文件、升级不丢（推荐）；② 直接编辑本文件顶部 DATA。逐字段说明见仓库 docs/DATA.md。",
+      "第二部分支持<b>流水导入</b>：可直接选择银行流水 PDF（首次需联网加载解析组件，解析在本地完成）或粘贴文本，自动生成流水概况、收入结构、大额支出三节；导入结果存于浏览器本地，可一键清除。",
+      "示例中的数字彼此自洽（分布条、占比、合计都对得上），替换时建议保持口径一致：数值统一千分位纯数字；固定资产按残值估值；虚拟股按购入成本计。",
+      "填完后点 Hero 上的按钮，可把「月支出/房租」口径带入 <b>财富自由计算器.html</b>（需放在同一文件夹）。",
+      "隐私提醒：本文件包含全部财务明细，注意保管；分享前先确认已清掉真实数据。"
+    ]
+  },
+
+  /* ---- 置顶：资金分布&计划总览 ---- */
+  overview: {
+    title: "资金分布&计划总览：【填计划期，如 2026.11-2027.06 八个月计划】",
+    note: "含固定资产、股权与公积金：汽车按车龄残值估值，虚拟股按购入成本计，公积金按账户余额计；预期为计划期末基本盘（不含奖金/退税/分红）。",
+    arrowCap: "N 个月计划<br>定投 4,000/月<br>安全垫 3,000/月<br>ESOP 预备 5,000/月<br>固定资产折旧 ≈10,000",
+    now: {
+      head: "现在 · 【年月】",
+      total: "总资产 ≈440,000",
+      sub: "｜ 净资产 ≈420,000（欠款 20,000）",
+      stack: [
+        { w: 34.2, color: "#8b5cf6", label: "固定资产 34.1%" },
+        { w: 40.9, color: "var(--orange)", label: "虚拟股 40.9%" },
+        { w: 13.6, color: "#14b8a6", label: "公积金 13.6%" },
+        { w: 6.8, color: "var(--blue)" },
+        { w: 4.5, color: "#8a93a8" }
+      ],
+      rows: [
+        { c: "#8b5cf6", name: "固定资产（汽车 · 残值估值）", amt: "≈150,000", pc: "34.1%" },
+        { c: "var(--orange)", name: "公司虚拟股 ESOP（成本）", amt: "180,000", pc: "40.9%" },
+        { c: "#14b8a6", name: "住房公积金（限住房用途）", amt: "60,000", pc: "13.6%" },
+        { c: "var(--blue)", name: "基金组合", amt: "30,000", pc: "6.8%" },
+        { c: "#8a93a8", name: "银行卡活期", amt: "20,000", pc: "4.5%" },
+        { c: "var(--green)", name: "安全垫", amt: "0", pc: "0%" },
+        { name: "负债（朋友A）", amt: "-20,000", pc: "—", muted: true, neg: true }
+      ]
+    },
+    exp: {
+      head: "预期 · 【计划期末】（基本盘）",
+      total: "总资产 ≈512,000",
+      sub: "｜ 负债 0",
+      stack: [
+        { w: 35.2, color: "var(--orange)", label: "虚拟股 35.2%" },
+        { w: 27.3, color: "#8b5cf6", label: "固定资产 27.3%" },
+        { w: 12.1, color: "var(--blue)", label: "基金 12.1%" },
+        { w: 11.7, color: "#14b8a6" },
+        { w: 7.8, color: "#f5b04c" },
+        { w: 4.7, color: "var(--green)" },
+        { w: 1.2, color: "#8a93a8" }
+      ],
+      rows: [
+        { c: "var(--orange)", name: "公司虚拟股 ESOP（成本）", amt: "180,000", pc: "35.2%" },
+        { c: "#8b5cf6", name: "固定资产（汽车 · 残值估值）", amt: "≈140,000", pc: "27.3%" },
+        { c: "var(--blue)", name: "基金持仓", amt: "≈62,000", pc: "12.1%" },
+        { c: "#14b8a6", name: "住房公积金（未计后续缴存）", amt: "60,000", pc: "11.7%" },
+        { c: "#f5b04c", name: "ESOP 预备金", amt: "40,000", pc: "7.8%" },
+        { c: "var(--green)", name: "安全垫（货币/T+0）", amt: "24,000", pc: "4.7%" },
+        { c: "#8a93a8", name: "银行常备", amt: "≈6,000", pc: "1.2%" }
+      ],
+      callout: "另：虚拟股集中度由 40.9% 降至 35.2%；计划期后用预备金+奖金再购时请设上限，防止集中度反弹。【示例】"
+    },
+    tableRows: [
+      { tag: "公司 ESOP（成本）", tagCls: "tag-orange", now: "180,000", exp: "180,000", note: "持有不动；计划期后视集中度纪律再购（设上限）" },
+      { tag: "固定资产（汽车）", tagStyle: "background:#f1ecfe;color:#6d4fd0;", now: "≈150,000", exp: "≈140,000", note: "按车龄残值估值；计划期再折旧 ≈10,000" },
+      { tag: "住房公积金", tagStyle: "background:#dff7f4;color:#0e8578;", now: "60,000", exp: "60,000", note: "限住房用途；预期未计继续缴存，属上行项" },
+      { tag: "基金组合", tagCls: "tag-blue", now: "30,000", exp: "≈62,000", note: "存量 + 固定定投 4,000 × 8 个月" },
+      { tag: "安全垫", tagCls: "tag-green", now: "0", exp: "24,000", note: "每月 3,000 × 8 个月分批储备" },
+      { tag: "ESOP 预备金", tagStyle: "background:#fdf0df;color:#c06e10;", now: "0", exp: "40,000", note: "每月 5,000，供下次认购窗口" },
+      { tag: "银行活期", tagCls: "tag-gray", now: "20,000", exp: "≈6,000", note: "首月还债 20,000 后保留常备" },
+      { tag: "负债（朋友A）", tagCls: "tag-red", now: "-20,000", exp: "0", note: "2026-11 结清【示例】" },
+      { tag: "总资产", now: "≈440,000", exp: "≈512,000", note: "基本盘口径；含奖金/退税/分红再加额外上行", total: true },
+      { tag: "净资产", now: "≈420,000", exp: "≈512,000", note: "负债清零后两者相等", total: true }
+    ],
+    readout: '<b>结构读数（示例）：</b>把固定资产、虚拟股、公积金都计入后——现在总资产约 440,000，其中"不可随时变现"的虚拟股 + 固定资产占 <b>75.0%</b>、限住房用途的公积金占 <b>13.6%</b>，可投金融流动资产仅 <b>11.4%</b>；计划执行 8 个月后，总资产约 512,000，金融流动资产（基金+垫+预备+现金）<b>132,000、占比升至 25.8%</b>。请按你的真实数据重写本段结论。'
+  },
+
+  /* ---- 三大部分 ---- */
+  parts: [
+    {
+      id: "pb1", nav: { ico: "1", lab: "资金计划" },
+      no: "第一部分", title: "N 个月资金执行计划",
+      note: "【填计划期】｜ 定投固定每月 4,000 · 安全垫分批储备 · 认购窗口全额自筹（示例：8 个月）",
+      rules: {
+        title: "🛡 1.5 三条不变的保护规则",
+        items: [
+          { no: "1", b: "超支罚则", p: "消费超预算的部分只从预备金扣，安全垫和定投永不挪用；连续两月超支就把预算改到现实水平，同口径下调目标——别硬扛后报复性放弃。【示例】" },
+          { no: "2", b: "一次性收入去向定死", p: "退税 → 定投；奖金 → 预备金为主；补贴 → 当月缓冲。任何一项落地都不改变月度模板。【示例】" },
+          { no: "3", b: "接受\"先垫后仓\"的小代价", p: "定投第 1 个月即满额、安全垫后期才存满——期间市场下跌会有几千元浮亏。这是固定定投的代价，可接受，不因浮亏停扣。【示例】" }
+        ]
+      },
+      sections: [
+        { id: "sec-1-1", title: "1.1 每月资金使用计划", blocks: [
+          { t: "sub", html: "每月可支配 12,000 元 = 收入 18,000 − 消费 6,000，固定切为三份，月月光。【示例】" },
+          { t: "allocbar", items: [
+            { cls: "ab-consume", label: "消费 6,000" },
+            { cls: "ab-invest", label: "定投 4,000" },
+            { cls: "ab-cushion", label: "安全垫 3,000" },
+            { cls: "ab-esop", label: "ESOP 预备 5,000" }
+          ]},
+          { t: "table", head: ["池子", { h: "金额/月", num: true }, "说明"], rows: [
+            { cells: ['<span class="tag tag-gray">消费</span>', { h: "6,000", num: true }, "房租+管理费 3,200 ｜ 饮食 2,000 ｜ 其他消费 800"] },
+            { cells: ['<span class="tag tag-blue">定投（固定）</span>', { h: "<b>4,000</b>", num: true }, "指数/红利两只；金额与标的按自己情况填"] },
+            { cells: ['<span class="tag tag-green">安全垫</span>', { h: "3,000", num: true }, "存到 <b>24,000 为止</b>（≈3~6 个月开销），货币/T+0 产品，锁定不动"] },
+            { cells: ['<span class="tag tag-orange">ESOP 预备金</span>', { h: "5,000", num: true }, "活期理财，下次认购窗口的弹药（无认购计划可并入定投）"] }
+          ]},
+          { t: "callout", html: "<b>执行设置：</b>按月、发薪次日各笔自动扣款；双周定投则金额减半频次加倍。<b>【示例——按你的发薪日与平台改写】</b>" }
+        ]},
+        { id: "sec-1-2", title: "1.2 逐月执行表", blocks: [
+          { t: "sub", html: "只有一条变化线：安全垫存满后，其月投并入 ESOP 预备金。【示例为 8 个月】" },
+          { t: "table", head: ["月份", { h: "定投", num: true }, { h: "安全垫月投", num: true }, { h: "安全垫累计", num: true }, { h: "预备月投", num: true }, { h: "预备累计", num: true }, "当月特殊事项"], rows: [
+            { cls: "hl-red", cells: ["2026-11", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "3,000", num: true }, { h: "5,000", num: true }, { h: "5,000", num: true }, '<span class="tag tag-red">还债</span> 还朋友A 20,000（从现有余额扣，不动模板）'] },
+            { cells: ["2026-12", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "6,000", num: true }, { h: "5,000", num: true }, { h: "10,000", num: true }, '<span class="muted">—</span>'] },
+            { cells: ["2027-01", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "9,000", num: true }, { h: "5,000", num: true }, { h: "15,000", num: true }, '<span class="muted">—</span>'] },
+            { cells: ["2027-02", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "12,000", num: true }, { h: "5,000", num: true }, { h: "20,000", num: true }, '<span class="muted">—</span>'] },
+            { cells: ["2027-03", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "15,000", num: true }, { h: "5,000", num: true }, { h: "25,000", num: true }, '<span class="muted">—</span>'] },
+            { cls: "hl-green", cells: ["2027-04", { h: "4,000", num: true }, { h: "3,000", num: true }, { h: "18,000", num: true }, { h: "5,000", num: true }, { h: "30,000", num: true }, '<span class="tag tag-blue">退税</span> 个税汇算若到账 → 全额进定投'] },
+            { cls: "hl-orange", cells: ["2027-05", { h: "4,000", num: true }, { h: "6,000", num: true }, { h: "24,000", num: true }, { h: "2,000", num: true }, { h: "32,000", num: true }, '<span class="tag tag-green">垫满</span> 安全垫存满，其后月投并入预备'] },
+            { cls: "hl-orange", cells: ["2027-06", { h: "4,000", num: true }, { h: "—", num: true }, { h: "24,000", num: true }, { h: "8,000", num: true }, { h: "40,000", num: true }, '<span class="tag tag-red">车险</span> 续保 ~6,000（从当月预备扣）【示例】'] }
+          ]},
+          { t: "callout", html: "<b>计划期后窗口：</b>弹药 = 预备金 40,000 + 奖金切分 ≈50,000 ≈ <b>90,000</b>，按集中度纪律设再购上限，<b>全程零借款</b>。【示例】" }
+        ]},
+        { id: "sec-1-3", title: "1.3 一次性收入&支出（规划）", blocks: [
+          { t: "sub", html: "均不计入基本盘；落地即超额完成。以下为示例行，按自己的大额收支增删。" },
+          { t: "table", head: [{ h: "预计时点", w: "100px" }, "可能的大额收入", { h: "预期金额", num: true }, "去向（提前定死）"], rows: [
+            { cells: ["2027-04", "个税年度汇算退税", { h: "+3,000~8,000", num: true }, "全额进定投加仓"] },
+            { cells: ["2027-05", "年终奖", { h: "+60,000~90,000", num: true }, "30,000~40,000 补预备金，其余进定投"] },
+            { cells: ["不定期", "公司补贴/报销", { h: "400~2,600/月", num: true }, "当月缓冲：消费超支从这里对冲"] }
+          ]},
+          { t: "gap", h: 14 },
+          { t: "table", head: [{ h: "预计时点", w: "100px" }, "可能的大额支出", { h: "金额", num: true }, "说明"], rows: [
+            { cells: ["2026-11", "还朋友A借款", { h: "20,000", num: true }, "已排入当月，从余额扣"] },
+            { cells: ["2027-06", "车险续保", { h: "~6,000", num: true }, "去年 6 月 6,082，确定性最高"] },
+            { cells: ["计划期后", "ESOP 认购", { h: "≤80,000", num: true }, "资金须计划期末备好"] },
+            { cells: ["不定期", "数码换新/大件", { h: "4,000~6,000", num: true }, "若发生，从当月预备扣，顺延目标"] }
+          ]}
+        ]},
+        { id: "sec-1-4", title: "1.4 预期仓位（计划期末）", blocks: [
+          { t: "sub", html: "基本盘口径：不含奖金 / 退税 / 分红 / 市场涨跌。【示例】" },
+          { t: "cards", items: [
+            { lab: "安全垫（货币/T+0）", val: "24,000", note: "2027-04 底存满，锁定不动" },
+            { lab: "基金持仓", val: "≈62,000", note: "存量 30,000 + 定投累计 32,000" },
+            { lab: "ESOP 预备金", val: "40,000", note: "认购窗口弹药主体" },
+            { lab: "流动资产合计", val: "≈132,000", note: "若 5 月年终奖如约到账 → ≈190,000", total: true }
+          ]}
+        ]}
+      ]
+    },
+
+    {
+      id: "pb2", nav: { ico: "2", lab: "流水分析" },
+      no: "第二部分", title: "银行流水分析",
+      note: "使用下方「流水导入」粘贴流水文本，本节自动生成 ｜ 或在 DATA 中手写",
+      sections: [
+        { id: "sec-2-1", title: "2.1 流水概况（待导入）", blocks: [
+          { t: "sub", html: "在「📥 流水导入」中粘贴银行流水文本（电子回单里全选复制即可），本节将自动生成按年汇总表。" },
+          { t: "callout", kind: "ok", html: "<b>提示：</b>解析完全在浏览器本地完成，不上传任何数据；导入结果保存在浏览器 localStorage，可随时清除。" }
+        ]},
+        { id: "sec-2-2", title: "2.2 收入结构（待导入）", blocks: [
+          { t: "sub", html: "导入流水后，按「雇主户名关键词 + 摘要关键词」自动分类：月薪 / 年终奖 / 补贴报销，并生成补贴季度分布。" }
+        ]},
+        { id: "sec-2-3", title: "2.3 大额支出（待导入）", blocks: [
+          { t: "sub", html: "导入流水后，自动列出金额 ≥ 阈值（默认 5,000）的支出 Top 20，可据此手工归类购车/租房/医疗等。" }
+        ]},
+        { id: "sec-2-4", title: "2.4 消费画像", blocks: [
+          { t: "sub", html: "【示例——导入流水后按自己的结论改写】四张卡片概括消费特征。" },
+          { t: "picgrid", items: [
+            { h: "🍱 高频刚需单价低", d: "餐饮/通勤单价低、频次高，占收入比例很小" },
+            { h: "🎟 精打细算爱退款", d: "大量小额退款：比价、用券、不满意就退" },
+            { h: "🎮 小额订阅日常化", d: "小额娱乐支出频次高、金额小" },
+            { h: "🛡 无危险信号", d: "无赌博、高利贷、大额冲动消费" }
+          ]}
+        ]},
+        { id: "sec-2-5", title: "2.5 资金管理习惯", blocks: [
+          { t: "h4", html: 'A · 现金流闭环 <span class="hint">—— 【示例】按自己的资金调度习惯改写</span>' },
+          { t: "flow", steps: [
+            { t: "工资入账", d: "每月 X 日" },
+            { t: "自动归集", d: "扫入活期理财" },
+            { t: "按需赎回", d: "支出前精确补足" },
+            { t: "余额归零", d: "不留闲钱" }
+          ]},
+          { t: "h4", html: "B · 理财梯队" },
+          { t: "tier", rows: [
+            { w: "min(100%,460px)", bg: "var(--blue)", label: "L1 活期理财（主仓）", tag: "示例标签", tagCls: "tag-gray" },
+            { w: "min(60%,280px)", bg: "#5b8bf0", label: "L2 定期/债基", tag: "示例标签", tagCls: "tag-gray" },
+            { w: "min(34%,160px)", bg: "#8aa9f3", ink: true, label: "L3 券商/基金", tag: "定投主阵地", tagCls: "tag-orange" }
+          ]},
+          { t: "h4", html: 'C · 信用与其他 <span class="hint">—— 信用卡全额还款、无卡债【示例】</span>' },
+          { t: "ms", items: [
+            "信用卡月还与消费同步（免息周转）",
+            "消费贷/分期：无",
+            "大额支出前的资金调度：分批赎回、精确凑款"
+          ]}
+        ]}
+      ]
+    },
+
+    {
+      id: "pb3", nav: { ico: "3", lab: "健康度评估" },
+      no: "第三部分", title: "健康度评估",
+      note: "【示例】建议保留双口径：先评\"可随时调度的金融资产\"，再评含固定资产/股权/公积金的\"总资产\"",
+      sections: [
+        { id: "sec-3-1", title: "3.1 消费习惯【示例——按结论改写】", blocks: [
+          { t: "procons", prosTitle: "✓ 做得好的", pros: [
+            "刚性消费单价低，占收入比例小",
+            "比价/退款/用券习惯好",
+            "居住成本占收入比例健康",
+            "无赌博、高利贷等危险信号"
+          ], consTitle: "△ 值得注意", cons: [
+            "最大单笔消费（购车等）是否超出「≤12 个月收入」惯例",
+            "小额高频娱乐支出是否日常化",
+            "消费预算若大幅下调，执行难度评估"
+          ]},
+          { t: "callout", html: "<b>消费率估算（示例）：</b>年消费约 X 万（含房租），对年到手收入 Y 万而言，消费率约 Z%，储蓄率约 W%——对照同龄水平给出定位。" }
+        ]},
+        { id: "sec-3-2", title: "3.2 理财方式【示例——按持仓改写】", blocks: [
+          { t: "procons", prosTitle: "✓ 做得好的", pros: [
+            "现金流纪律：自动归集、按需赎回",
+            "用债守规矩、负债率低",
+            "大额支出前有资金调度"
+          ], consTitle: "△ 风险与短板", cons: [
+            "资产是否集中于单一雇主（工资 + 股权 + 福利同源）",
+            "权益类配置是否缺位",
+            "是否有个人保障险（重疾/医疗/意外）",
+            "应急垫是否偏薄"
+          ]},
+          { t: "details", title: "📊 投资分布（当前持仓）", blocks: [
+            { t: "h4", html: "当前持仓分布" },
+            { t: "distrows", rows: [
+              { name: "公司虚拟股 ESOP（成本）", w: 60, color: "var(--orange)", pct: "60.0%" },
+              { name: "基金组合", w: 25, color: "var(--blue)", pct: "25.0%" },
+              { name: "银行卡活期", w: 15, color: "#8a93a8", pct: "15.0%" }
+            ]},
+            { t: "table", head: ["资产", { h: "金额", num: true }, { h: "占比", num: true }, "属性"], rows: [
+              { cells: ["公司虚拟股 ESOP", { h: "180,000", num: true }, { h: "60.0%", num: true }, "单一公司股权，不可随时变现"] },
+              { cells: ["基金组合", { h: "30,000", num: true }, { h: "25.0%", num: true }, "中高风险混合"] },
+              { cells: ["银行卡活期", { h: "20,000", num: true }, { h: "15.0%", num: true }, "现金"] },
+              { cls: "total", cells: ["可投资产合计", { h: "230,000", num: true }, { h: "100%", num: true }, "另：汽车/公积金为非金融或限用途资产"] }
+            ]}
+          ]}
+        ]},
+        { id: "sec-3-3", title: "3.3 健康度评分卡（可投资产口径）【示例】", blocks: [
+          { t: "sub", html: "本节仅统计可随时调度的金融资产；总资产口径的完整再评价见 3.4。" },
+          { t: "table", head: ["维度", { h: "评价", w: "170px" }, "说明"], rows: [
+            { cells: ["储蓄率", { h: "★★★★★", cls: "stars" }, "【示例】对照同龄水平填写"] },
+            { cells: ["现金流纪律", { h: "★★★★★", cls: "stars" }, "【示例】零余额/自动归集等"] },
+            { cells: ["信用使用", { h: '★★★★<span class="off">★</span>', cls: "stars" }, "【示例】全额还款、负债率"] },
+            { cells: ["消费结构", { h: '★★★★<span class="off">★</span>', cls: "stars" }, "【示例】刚需克制；大件/小额娱乐"] },
+            { cells: ["资产分散度", { h: '★★★<span class="off">★★</span>', cls: "stars" }, "【示例】单一公司股权占比"] },
+            { cells: ["风险保障", { h: '★★<span class="off">★★★</span>', cls: "stars" }, "【示例】有无个人重疾/医疗险"] },
+            { cells: ["应急垫", { h: '★★<span class="off">★★★</span>', cls: "stars" }, "【示例】流动资产可撑几个月开销"] }
+          ]},
+          { t: "callout", html: "<b>一句话总结（示例）：</b>过程管理如何、结构短板是什么、计划如何针对短板。<b>总资产口径的再评价见 3.4。</b>" }
+        ]},
+        { id: "sec-3-4", title: "3.4 总资产口径再评价【示例——按真实数据重写】", blocks: [
+          { t: "sub", html: "把固定资产、股权、公积金都计入后的完整资产负债表。口径建议：车按残值、股权按成本、公积金按余额（限住房用途，不计后续缴存）。" },
+          { t: "callout", kind: "ok", html: "<b>总评（示例）：</b><b>总量维度</b>（净资产 ≈ N 个月工资、负债率、有无坏债）与<b>结构维度</b>（不可随时变现占比、限用途占比、单一雇主集中度）分开打分；结论写清\"把金融流动资产占比从 X% 做到 Y%\"这一条主线。" },
+          { t: "table", head: ["维度", "总资产口径读数", { h: "评价", w: "150px" }], rows: [
+            { cells: ["净资产总量", "【示例】≈ N 个月工资", { h: "★★★★★", cls: "stars" }] },
+            { cells: ["负债管理", "【示例】负债率、有无房贷/消费贷、借款用途", { h: "★★★★★", cls: "stars" }] },
+            { cells: ["流动性占比", "【示例】金融流动资产 / 总资产；公积金等限用途资产不计入", { h: '★★<span class="off">★★★</span>', cls: "stars" }] },
+            { cells: ["资产集中度", "【示例】单一公司股权占比；是否与工资同源", { h: '★★<span class="off">★★★</span>', cls: "stars" }] },
+            { cells: ["贬值性资产", "【示例】汽车等折旧资产的占比与年持有成本", { h: '★★<span class="off">★★★</span>', cls: "stars" }] },
+            { cells: ["压力测试", "【示例】收入中断可撑多久；脉冲式大额支出史", { h: '★★<span class="off">★★★</span>', cls: "stars" }] },
+            { cells: ["结构修复路径", "【示例】计划执行后的占比变化", { h: '★★★★★', cls: "stars" }] }
+          ]},
+          { t: "callout", kind: "warn", html: '<b>折扣读数（示例）：</b>总资产 ≈ 沉没的消费（车） + 绑定雇主的权益（股权） + 限用途资产（公积金） + 真正可用的钱。"账面富裕、现金紧张"与否，用这四块拆开看。' },
+          { t: "callout", html: "<b>执行期纪律（示例）：</b>不再新增不可变现资产，让结构自己修复。" }
+        ]}
+      ]
+    }
+  ]
+};
+</script>
+
+<script>
+/* =====================================================================
+   渲染器 —— 只认 DATA，不含具体数字。
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, html){ const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+const fmt = n => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* ---- Hero ---- */
+function renderHero(){
+  const m = DATA.meta, box = $("heroBox");
+  box.innerHTML = "";
+  box.appendChild(el("h1", "", m.title));
+  box.appendChild(el("p", "sub", m.subtitle));
+  const chips = el("div", "chips");
+  chips.appendChild(el("div", "chip dim", `${m.statsDim.label} <b>${m.statsDim.text}</b>`));
+  box.appendChild(chips);
+  const split = el("div", "stat-split");
+  [["now", "stat-side now"], ["exp", "stat-side exp"]].forEach(([key, cls]) => {
+    const side = DATA.hero[key], card = el("div", cls);
+    card.appendChild(el("div", "ss-head", side.head));
+    const items = el("div", "ss-items");
+    side.items.forEach(it => {
+      const it2 = el("div", "ss-item");
+      it2.appendChild(el("span", "", it.label)); it2.appendChild(el("b", "", it.b));
+      items.appendChild(it2);
+    });
+    card.appendChild(items); split.appendChild(card);
+    if (key === "now") split.appendChild(el("div", "stat-arrow", "➜"));
+  });
+  box.appendChild(split);
+  if (m.calculator){
+    const wrap = el("div", "");
+    wrap.style.cssText = "margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;";
+    const btn = el("button", "ffc-btn", m.calculator.btn);
+    btn.title = m.calculator.tip || "";
+    btn.addEventListener("click", () => {
+      try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields })); } catch(e){}
+      window.open(m.calculator.file, "_blank");
+    });
+    wrap.appendChild(btn);
+    wrap.appendChild(el("span", "ffc-tip", m.calculator.tip || ""));
+    box.appendChild(wrap);
+  }
+}
+
+/* ---- 使用说明 ---- */
+function renderGuide(){
+  const g = DATA.guide, box = $("guideBox");
+  box.innerHTML = "";
+  if (!g) return;
+  const d = el("details", "sec"); d.id = "sec-guide";
+  d.appendChild(el("summary", "", g.title + '<span class="chev">▼</span>'));
+  const body = el("div", "sec-body");
+  const ol = el("ol");
+  ol.style.cssText = "margin:0;padding-left:22px;line-height:1.9;font-size:13.5px;";
+  g.steps.forEach(s => ol.appendChild(el("li", "", s)));
+  body.appendChild(ol);
+  /* 数据导出/导入：用户数据只存 localStorage / JSON 文件，不改模板源码、随版本升级保留 */
+  const DATA_LS = "FRI_DATA_V1";
+  const row = el("div", "");
+  row.style.cssText = "display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;";
+  const mkBtn = (label) => { const b = el("button", "", label); b.style.cssText = "background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);"; return b; };
+  const expBtn = mkBtn("💾 导出我的数据（JSON 备份）");
+  expBtn.addEventListener("click", () => {
+    const payload = JSON.stringify({ app: "finance-report-cn", version: 1, exportedAt: new Date().toISOString(), data: DATA }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "finance-report-data.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  });
+  const impBtn = mkBtn("⬆️ 导入我的数据（选择 JSON 备份）");
+  const fileIn = el("input"); fileIn.type = "file"; fileIn.accept = ".json,application/json"; fileIn.style.display = "none";
+  impBtn.addEventListener("click", () => fileIn.click());
+  fileIn.addEventListener("change", async () => {
+    const f = fileIn.files && fileIn.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      if (!obj || !obj.data || !obj.data.meta || !Array.isArray(obj.data.parts)) throw new Error("结构不符");
+      Object.keys(DATA).forEach(k => delete DATA[k]);
+      Object.assign(DATA, obj.data);
+      try { localStorage.setItem(DATA_LS, JSON.stringify({ savedAt: Date.now(), data: obj.data })); } catch(e){}
+      boot();
+      alert("数据已导入并生效（保存在本浏览器，刷新后仍在）。请再次确认：含有真实数据的 JSON 与 HTML 都不要上传到公共仓库。");
+    } catch (e) {
+      alert("导入失败：" + e.message + "——请选择由「导出我的数据」生成的 JSON 文件。");
+    }
+    fileIn.value = "";
+  });
+  row.appendChild(expBtn); row.appendChild(impBtn); row.appendChild(fileIn);
+  const tip = el("span", "", "数据只存本浏览器 / 备份 JSON 文件，不上传。");
+  tip.style.cssText = "font-size:12px;color:var(--sub);";
+  row.appendChild(tip);
+  body.appendChild(row);
+  d.appendChild(body); box.appendChild(d);
+}
+
+/* ---- 置顶总览 ---- */
+function distCard(key, cls){
+  const d = DATA.overview[key], card = el("div", "dist-card " + cls);
+  card.appendChild(el("div", "dc-head", d.head));
+  card.appendChild(el("div", "dc-total", d.total + ' <span style="font-size:12px;font-weight:400;color:var(--sub);">' + d.sub + "</span>"));
+  const stack = el("div", "dstack");
+  d.stack.forEach(s => {
+    const seg = el("div", "", s.label || "");
+    seg.style.width = s.w + "%";
+    seg.style.background = s.color;
+    stack.appendChild(seg);
+  });
+  card.appendChild(stack);
+  d.rows.forEach(r => {
+    const row = el("div", "drow"), nm = el("div", "nm");
+    if (r.c) { const dot = el("span", "dot", ""); dot.style.background = r.c; nm.appendChild(dot); }
+    nm.appendChild(document.createTextNode(r.name));
+    if (r.muted) nm.classList.add("muted");
+    row.appendChild(nm);
+    row.appendChild(el("div", "amt" + (r.neg ? " neg" : ""), r.amt));
+    row.appendChild(el("div", "pc2", r.pc));
+    card.appendChild(row);
+  });
+  if (d.callout) { const c = el("div", "callout ok", d.callout); c.style.marginTop = "12px"; card.appendChild(c); }
+  return card;
+}
+function renderOverview(){
+  const o = DATA.overview, box = $("overviewBox");
+  box.innerHTML = "";
+  const sec = el("section", "sec-body");
+  sec.style.cssText = "background:var(--card);border-radius:14px;box-shadow:0 1px 3px rgba(28,35,51,.06);padding:22px 24px;margin-bottom:18px;";
+  const h3 = el("h3", "", "");
+  h3.style.cssText = "font-size:17px;display:flex;align-items:center;gap:10px;margin-bottom:2px;";
+  const bar = el("span", "", ""); bar.style.cssText = "width:5px;height:18px;border-radius:3px;background:var(--blue);display:inline-block;";
+  h3.appendChild(bar); h3.appendChild(document.createTextNode(o.title));
+  sec.appendChild(h3);
+  const sub = el("p", "sec-sub", o.note); sub.style.marginBottom = "12px"; sec.appendChild(sub);
+  const grid = el("div", "dist-grid");
+  grid.appendChild(distCard("now", "now"));
+  const arw = el("div", "dist-arrow");
+  arw.appendChild(el("div", "big", "➜")); arw.appendChild(el("div", "cap", o.arrowCap));
+  grid.appendChild(arw);
+  grid.appendChild(distCard("exp", "exp"));
+  sec.appendChild(grid);
+  const det = el("details", "sub");
+  det.appendChild(el("summary", "", '详细项目对照表：现在 ➜ 预期（含结构读数）<span class="chev">▼</span>'));
+  const body = el("div", "sub-body");
+  const tbl = el("div", "tbl-wrap"), table = el("table");
+  table.innerHTML = '<thead><tr><th>项目</th><th class="num">现在</th><th></th><th class="num">预期</th><th>说明（箭头关系）</th></tr></thead>';
+  const tb = el("tbody");
+  o.tableRows.forEach(r => {
+    const tr = el("tr", r.total ? "total" : "");
+    const tagStyle = r.tagStyle ? ` style="${r.tagStyle}"` : "";
+    const tag = r.tagCls ? `<span class="tag ${r.tagCls}">${r.tag}</span>` : `<span class="tag"${tagStyle}>${r.tag}</span>`;
+    tr.innerHTML = `<td>${tag}</td><td class="num">${r.now}</td><td class="arw">➜</td><td class="num">${r.exp}</td><td>${r.note}</td>`;
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); tbl.appendChild(table); body.appendChild(tbl);
+  body.appendChild(el("div", "callout warn", o.readout));
+  det.appendChild(body); sec.appendChild(det);
+  box.appendChild(sec);
+}
+
+/* ---- 通用 block 渲染 ---- */
+function renderBlocks(container, blocks){
+  blocks.forEach(b => {
+    switch (b.t) {
+      case "sub": container.appendChild(el("p", "sec-sub", b.html)); break;
+      case "h4": container.appendChild(el("h4", "", b.html)); break;
+      case "callout": container.appendChild(el("div", "callout" + (b.kind ? " " + b.kind : ""), b.html)); break;
+      case "gap": { const g = el("div", "", ""); g.style.height = (b.h || 14) + "px"; container.appendChild(g); break; }
+      case "allocbar": { const w = el("div", "allocbar"); b.items.forEach(i => w.appendChild(el("div", i.cls, i.label))); container.appendChild(w); break; }
+      case "cards": { const w = el("div", "cards"); b.items.forEach(i => { const c = el("div", "pcard" + (i.total ? " total" : "")); c.appendChild(el("div", "lab", i.lab)); c.appendChild(el("div", "val", i.val)); c.appendChild(el("div", "note", i.note)); w.appendChild(c); }); container.appendChild(w); break; }
+      case "picgrid": { const w = el("div", "pic-grid"); b.items.forEach(i => { const c = el("div", "pic-card"); c.appendChild(el("div", "h", i.h)); c.appendChild(el("div", "d", i.d)); w.appendChild(c); }); container.appendChild(w); break; }
+      case "flow": { const w = el("div", "flow"); b.steps.forEach((s, i) => { if (i) w.appendChild(el("div", "arrow", "➜")); const st = el("div", "step"); st.appendChild(el("div", "t", s.t)); st.appendChild(el("div", "d", s.d)); w.appendChild(st); }); container.appendChild(w); break; }
+      case "tier": { const w = el("div", "tier"); b.rows.forEach(r => { const row = el("div", "t-row"); const bar = el("div", "t-bar", r.label); bar.style.width = r.w; bar.style.background = r.bg; if (r.ink) bar.style.color = "var(--ink)"; row.appendChild(bar); row.appendChild(el("span", "tag " + r.tagCls, r.tag)); w.appendChild(row); }); container.appendChild(w); break; }
+      case "ms": { const w = el("div", "ms"); b.items.forEach(i => w.appendChild(el("span", "", i))); container.appendChild(w); break; }
+      case "procons": { const w = el("div", "pc-grid"); [["pros", b.prosTitle, b.pros], ["cons", b.consTitle, b.cons]].forEach(([cls, tt, list]) => { const pc = el("div", "pc " + cls); pc.appendChild(el("h4", "", tt)); const ul = el("ul"); list.forEach(li => ul.appendChild(el("li", "", li))); pc.appendChild(ul); w.appendChild(pc); }); container.appendChild(w); break; }
+      case "distrows": b.rows.forEach(r => { const row = el("div", "dist-row2"); row.appendChild(el("div", "name", r.name)); const bar = el("div", "bar"); const i = el("i", "", ""); i.style.width = r.w + "%"; i.style.background = r.color; bar.appendChild(i); row.appendChild(bar); row.appendChild(el("div", "pct", r.pct)); container.appendChild(row); }); break;
+      case "table": container.appendChild(buildTable(b)); break;
+      case "details": { const d = el("details", "sub"); d.appendChild(el("summary", "", b.title + '<span class="chev">▼</span>')); const sb = el("div", "sub-body"); renderBlocks(sb, b.blocks); d.appendChild(sb); container.appendChild(d); break; }
+    }
+  });
+}
+function buildTable(b){
+  const wrap = el("div", "tbl-wrap"), table = el("table"), thead = el("thead"), hr = el("tr");
+  b.head.forEach(hc => { const th = el("th", typeof hc === "object" && hc.num ? "num" : "", typeof hc === "object" ? hc.h : hc); if (typeof hc === "object" && hc.w) th.style.width = hc.w; hr.appendChild(th); });
+  thead.appendChild(hr); table.appendChild(thead);
+  const tb = el("tbody");
+  b.rows.forEach(r => {
+    const tr = el("tr", r.cls || "");
+    r.cells.forEach(c => {
+      if (typeof c === "object" && c.bar !== undefined) { const td = el("td"); const qb = el("div", "qbar"); const i = el("i", "", ""); i.style.width = c.bar + "%"; qb.appendChild(i); td.appendChild(qb); tr.appendChild(td); return; }
+      const td = el("td");
+      if (typeof c === "object") {
+        const cl = [];
+        if (c.num) cl.push("num");
+        if (c.cls) cl.push(c.cls);
+        if (cl.length) td.className = cl.join(" ");
+        td.innerHTML = c.h;
+      } else td.innerHTML = c;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); wrap.appendChild(table);
+  return wrap;
+}
+
+/* ---- 三大部分 ---- */
+function buildSection(s){
+  const d = el("details", "sec"); d.id = s.id;
+  d.appendChild(el("summary", "", s.title + '<span class="chev">▼</span>'));
+  const body = el("div", "sec-body");
+  renderBlocks(body, s.blocks);
+  d.appendChild(body);
+  return d;
+}
+function renderParts(){
+  const box = $("partsBox"), fab = $("fab");
+  box.innerHTML = ""; fab.innerHTML = "";
+  fab.appendChild(el("div", "brand", "¥"));
+  if (DATA.meta.importer) box.appendChild(buildImporter());
+  DATA.parts.forEach(p => {
+    const blk = el("div", "pblock"); blk.id = p.id;
+    const banner = el("div", "part"); banner.id = p.id.replace("pb", "part");
+    banner.appendChild(el("span", "no", p.no));
+    banner.appendChild(el("h2", "", p.title));
+    banner.appendChild(el("span", "pnote", p.note));
+    blk.appendChild(banner);
+    if (p.rules) {
+      const grid = el("div", "p1-grid"), main = el("div", "p1-main");
+      p.sections.forEach(s => main.appendChild(buildSection(s)));
+      grid.appendChild(main);
+      const aside = el("aside", "p1-rules");
+      aside.appendChild(el("h4", "", p.rules.title));
+      p.rules.items.forEach(r => {
+        const row = el("div", "rule");
+        row.appendChild(el("div", "no", r.no));
+        const dv = el("div"); dv.appendChild(el("b", "", r.b)); dv.appendChild(el("p", "", r.p));
+        row.appendChild(dv); aside.appendChild(row);
+      });
+      grid.appendChild(aside); blk.appendChild(grid);
+    } else {
+      p.sections.forEach(s => blk.appendChild(buildSection(s)));
+    }
+    box.appendChild(blk);
+    const a = el("a", "", `<span class="ico">${p.nav.ico}</span><span class="lab">${p.nav.lab}</span>`);
+    a.href = "#" + banner.id; a.dataset.part = p.id;
+    fab.appendChild(a);
+  });
+}
+function renderFoot(){ $("footBox").textContent = DATA.meta.footer; }
+
+/* =====================================================================
+   流水导入 —— 本地解析银行流水文本（交行个人客户交易清单格式等），
+   自动生成 2.1 / 2.2 / 2.3，结果存 localStorage，可清除。不上传。
+   ===================================================================== */
+const LS_KEY = "FRI_TXNS_V1";
+
+/* ---- 银行流水格式注册表：贡献新银行格式 = 在这里加一个 entry（见 docs/IMPORT.md） ---- */
+const FORMATS = {
+  "bocom-personal": {
+    name: "交通银行 · 个人客户交易清单",
+    // 行结构：序号 日期 时间 交易类型 C/D 金额 余额 对方账号 户名 摘要…
+    re: /^\s*\d+\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\S+)\s+([CD])\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(\S+)\s+(.*)$/,
+    map: (m) => ({ d: m[1], t: m[3], dc: m[4], amt: parseFloat(m[5].replace(/,/g, "")), rest: (m[8] || "").trim() })
+  }
+};
+
+/* 折行合并：PDF 抽取常把"户名/摘要"拆到下一行——若某行以"序号+日期"开头但不匹配任何
+   格式，则把后续非新记录的行拼接进来再试（对复制粘贴路径同样生效） */
+function mergeWrappedLines(lines){
+  const fmts = Object.keys(FORMATS);
+  const startRe = /^\s*\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/;
+  const matched = (ln) => fmts.some(k => FORMATS[k].re.test(ln));
+  const out = [];
+  for (let i = 0; i < lines.length; i++){
+    let ln = lines[i];
+    if (startRe.test(ln) && !matched(ln)) {
+      let j = i + 1;
+      while (!matched(ln) && j < lines.length && !startRe.test(lines[j])) { ln += " " + lines[j]; j++; }
+      i = j - 1;
+    }
+    out.push(ln);
+  }
+  return out;
+}
+
+function parseStmtText(text){
+  const fmts = Object.keys(FORMATS);
+  const out = [];
+  mergeWrappedLines(text.split(/\r?\n/)).forEach(ln => {
+    for (const key of fmts) {
+      const f = FORMATS[key], m = f.re.exec(ln);
+      if (m) { out.push(f.map(m)); return; }
+    }
+  });
+  return out;
+}
+function classifyTxn(txn, r){
+  if (r.skipTypes.some(k => txn.t.includes(k))) return null;
+  if (!txn.rest.includes(r.employer)) return null;
+  if (r.subsidyKeywords.some(k => txn.rest.includes(k))) return "sub";
+  if (txn.rest.includes(r.salaryAbstract)) return txn.amt >= r.bonusMin ? "bonus" : "salary";
+  return "other";
+}
+function aggregate(txns, rules){
+  const dates = txns.map(t => t.d).sort();
+  const dMin = dates[0], dMax = dates[dates.length - 1];
+  const m1 = dMin.slice(0, 7).split("-").map(Number), m2 = dMax.slice(0, 7).split("-").map(Number);
+  const months = (m2[0] - m1[0]) * 12 + (m2[1] - m1[1]) + 1;
+  const byYear = {};
+  txns.forEach(t => {
+    const y = t.d.slice(0, 4); byYear[y] = byYear[y] || { n: 0, d: 0, c: 0 };
+    byYear[y].n++; if (t.dc === "D") byYear[y].d += t.amt; else byYear[y].c += t.amt;
+  });
+  const emp = { salary: {}, bonus: {}, sub: {}, other: {} };
+  txns.forEach(t => {
+    const c = classifyTxn(t, rules); if (!c || c === "other") return;
+    const y = t.d.slice(0, 4); emp[c][y] = emp[c][y] || [];
+    emp[c][y].push(t);
+  });
+  const quarters = {};
+  txns.forEach(t => {
+    if (classifyTxn(t, rules) !== "sub") return;
+    const y = t.d.slice(0, 4), q = Math.floor((+t.d.slice(5, 7) - 1) / 3) + 1, k = `${y} Q${q}`;
+    quarters[k] = quarters[k] || { n: 0, sum: 0, min: Infinity, max: -Infinity };
+    quarters[k].n++; quarters[k].sum += t.amt;
+    quarters[k].min = Math.min(quarters[k].min, t.amt); quarters[k].max = Math.max(quarters[k].max, t.amt);
+  });
+  const big = txns.filter(t => t.dc === "D" && t.amt >= rules.bigExpenseMin).sort((a, b) => b.amt - a.amt).slice(0, 20);
+  return { dMin, dMax, months, byYear, emp, quarters, big };
+}
+function buildImportBlocks(ag, rules){
+  const span = `${ag.dMin} ~ ${ag.dMax}`;
+  const years = Object.keys(ag.byYear).sort();
+  const yearRows = years.map(y => ({ cells: [y,
+    { h: String(ag.byYear[y].n), num: true }, { h: fmt(ag.byYear[y].d), num: true }, { h: fmt(ag.byYear[y].c), num: true }] }));
+  const yTot = years.reduce((a, y) => ({ n: a.n + ag.byYear[y].n, d: a.d + ag.byYear[y].d, c: a.c + ag.byYear[y].c }), { n: 0, d: 0, c: 0 });
+  const b21 = [
+    { t: "sub", html: `解析期间 <b>${span}</b>（约 ${ag.months} 个月），共命中 <b>${yTot.n.toLocaleString()}</b> 笔。` },
+    { t: "table", head: ["年份", { h: "笔数", num: true }, { h: "借方（支出）", num: true }, { h: "贷方（收入）", num: true }],
+      rows: yearRows.concat([{ cls: "total", cells: ["合计",
+        { h: String(yTot.n), num: true }, { h: fmt(yTot.d), num: true }, { h: fmt(yTot.c), num: true }] }]) }
+  ];
+  const label = { salary: "月薪工资", bonus: "年终奖/激励", sub: "补贴/报销（小额）" };
+  const rows22 = ["salary", "bonus", "sub"].map(c => {
+    const ys = Object.keys(ag.emp[c]).sort();
+    if (!ys.length) return null;
+    const n = ys.reduce((s, y) => s + ag.emp[c][y].length, 0);
+    const sum = ys.reduce((s, y) => s + ag.emp[c][y].reduce((x, t) => x + t.amt, 0), 0);
+    return { cells: [`<span class="tag ${c === "sub" ? "tag-green" : c === "bonus" ? "tag-orange" : "tag-blue"}">${label[c]}</span>`,
+      { h: String(n), num: true }, { h: fmt(sum), num: true },
+      ys.map(y => `${y}（${ag.emp[c][y].length} 笔 / ${fmt(ag.emp[c][y].reduce((x, t) => x + t.amt, 0))}）`).join("；")] };
+  }).filter(Boolean);
+  const b22 = [
+    { t: "sub", html: `按雇主户名关键词「<b>${rules.employer}</b>」+ 摘要关键词自动分类（工资通道金额 ≥ ${rules.bonusMin.toLocaleString()} 判为奖金；小额一律记补贴）。` },
+    { t: "table", head: ["类别", { h: "笔数", num: true }, { h: "合计（元）", num: true }, "分年明细"], rows: rows22 }
+  ];
+  const qk = Object.keys(ag.quarters).sort();
+  if (qk.length) {
+    const maxQ = Math.max(...qk.map(k => ag.quarters[k].sum));
+    b22.push({ t: "h4", html: `补贴/报销季度统计 <span class="hint">—— 共 ${qk.reduce((s, k) => s + ag.quarters[k].n, 0)} 笔 · ${fmt(qk.reduce((s, k) => s + ag.quarters[k].sum, 0))}</span>` });
+    const qRows = qk.map(k => {
+      const q = ag.quarters[k];
+      return { cells: [k, { h: String(q.n), num: true }, { h: fmt(q.sum), num: true },
+        { h: q.n > 1 ? `${fmt(q.min)}~${fmt(q.max)}` : fmt(q.min), num: true }, { bar: Math.round(q.sum / maxQ * 100) }] };
+    });
+    const qTotal = { cls: "total", cells: ["合计",
+      { h: String(qk.reduce((s, k) => s + ag.quarters[k].n, 0)), num: true },
+      { h: fmt(qk.reduce((s, k) => s + ag.quarters[k].sum, 0)), num: true },
+      { h: "—", num: true },
+      `月均 ≈${fmt(qk.reduce((s, k) => s + ag.quarters[k].sum, 0) / ag.months)}`] };
+    b22.push({ t: "table",
+      head: ["季度", { h: "笔数", num: true }, { h: "合计（元）", num: true }, { h: "单笔区间（元）", num: true }, { h: "季度分布", w: "190px" }],
+      rows: qRows.concat([qTotal]) });
+    b22.push({ t: "callout", html: "<b>读数（自动生成，请补充结论）：</b>补贴/报销多为脉冲式小额入账——只能当缓冲，不进收入基本盘。" });
+  }
+  const b23 = [
+    { t: "sub", html: `金额 ≥ ${rules.bigExpenseMin.toLocaleString()} 的支出 Top ${ag.big.length}（按金额降序），可据此手工归类购车/租房/医疗等大项。` },
+    { t: "table", head: [{ h: "#", num: true }, "日期", { h: "金额", num: true }, "对方户名 / 摘要（截断）"],
+      rows: ag.big.map((t, i) => ({ cells: [{ h: String(i + 1), num: true }, t.d, { h: fmt(t.amt), num: true },
+        t.rest.split(/交易流水号|订单编号|\|/)[0].trim().slice(0, 60) || "—" ] })) }
+  ];
+  return { b21, b22, b23, span };
+}
+function applyImport(txns, rules, save){
+  const ag = aggregate(txns, rules);
+  const blocks = buildImportBlocks(ag, rules);
+  DATA.meta.statsDim.text = `流水 ${txns.length.toLocaleString()} 笔 · ${ag.months} 个月`;
+  const p2 = DATA.parts.find(p => p.id === "pb2");
+  p2.note = `${blocks.span} · 本地解析`;
+  const setB = (id, blocks, title) => { const s = p2.sections.find(s => s.id === id); if (!s) return; s.blocks = blocks; if (title) s.title = title; };
+  setB("sec-2-1", blocks.b21, "2.1 流水概况");
+  setB("sec-2-2", blocks.b22, "2.2 收入结构");
+  setB("sec-2-3", blocks.b23, "2.3 大额支出（Top 20）");
+  boot();
+  if (save !== false) { try { localStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
+}
+function loadStoredImport(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj.txns || !obj.txns.length) return null;
+    return obj;
+  } catch(e){ return null; }
+}
+
+/* ---- PDF 文本抽取（按需联网加载 pdf.js，y 坐标分行后逐行拼接） ---- */
+let _pdfjsPromise = null;
+function loadPdfJs(){
+  if (_pdfjsPromise) return _pdfjsPromise;
+  _pdfjsPromise = new Promise((resolve, reject) => {
+    const urls = [
+      ["https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"],
+      ["https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+       "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"]
+    ];
+    const tryAt = (i) => {
+      if (i >= urls.length) { reject(new Error("解析组件加载失败（需要联网一次）；可改用复制粘贴")); return; }
+      const s = document.createElement("script");
+      s.src = urls[i][0];
+      s.onload = () => {
+        try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = urls[i][1]; resolve(window.pdfjsLib); }
+        catch (e) { tryAt(i + 1); }
+      };
+      s.onerror = () => tryAt(i + 1);
+      document.head.appendChild(s);
+    };
+    tryAt(0);
+  });
+  return _pdfjsPromise;
+}
+async function extractPdfText(buf){
+  const lib = await loadPdfJs();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const items = tc.items.filter(i => i.str && i.str.trim() !== "");
+    items.sort((a, b) => (b.transform[5] - a.transform[5]) || (a.transform[4] - b.transform[4]));
+    let cur = null; const lines = [];
+    items.forEach(it => {
+      const y = it.transform[5], x = it.transform[4];
+      if (!cur || Math.abs(cur.y - y) > 3) { cur = { y, parts: [] }; lines.push(cur); }
+      cur.parts.push({ x, s: it.str });
+    });
+    lines.forEach(l => out.push(l.parts.sort((a, b) => a.x - b.x).map(p => p.s).join(" ").replace(/\s+/g, " ").trim()));
+  }
+  return out.join("\n");
+}
+
+/* ---- 导入面板 ---- */
+function buildImporter(){
+  const d = el("details", "sec"); d.id = "sec-import";
+  d.appendChild(el("summary", "", "📥 流水导入（本地解析，不上传）<span class=\"chev\">▼</span>"));
+  const body = el("div", "sec-body");
+  const imp = DATA.meta.importer;
+  body.appendChild(el("p", "sec-sub", '支持<b>直接选择 PDF</b>（可多选；首次使用需联网加载解析组件，解析本身仍在本地完成）或 .txt / .csv，也可把 PDF 里的文本全选复制粘贴到下面；点「解析并预览」后「应用到报告」。解析按"行号 + 日期 + 时间 + 类型 + C/D + 金额 + 余额 + 账号 + 户名摘要"的流水清单格式逐行识别。'));
+  const grid = el("div", "");
+  grid.style.cssText = "display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px;";
+  const field = (label, id, val, type, w) => {
+    const dv = el("div", "");
+    dv.appendChild(el("label", "", label)).style.cssText = "display:block;font-size:12px;color:var(--sub);margin-bottom:3px;";
+    const inp = el("input", "", ""); inp.id = id; inp.type = type || "text"; inp.value = val;
+    inp.style.cssText = `border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;width:${w || 150}px;background:#fff;`;
+    dv.appendChild(inp); return dv;
+  };
+  grid.appendChild(field("雇主户名关键词", "impEmployer", imp.employer, "text", 160));
+  grid.appendChild(field("补贴摘要关键词（逗号分隔）", "impSubsidy", imp.subsidyKeywords.join(","), "text", 200));
+  grid.appendChild(field("奖金判定下限（元）", "impBonus", imp.bonusMin, "number", 120));
+  grid.appendChild(field("大额支出阈值（元）", "impBig", imp.bigExpenseMin, "number", 120));
+  const file = el("input", "", ""); file.type = "file"; file.accept = ".pdf,.txt,.csv,text/plain"; file.multiple = true;
+  file.style.cssText = "font-size:12.5px;";
+  const wrapFile = el("div", "");
+  wrapFile.appendChild(el("label", "", "或选择文件（可多选：PDF / TXT / CSV）")).style.cssText = "display:block;font-size:12px;color:var(--sub);margin-bottom:3px;";
+  wrapFile.appendChild(file);
+  grid.appendChild(wrapFile);
+  body.appendChild(grid);
+  const ta = el("textarea", "", "");
+  ta.id = "impText"; ta.rows = 6; ta.placeholder = "在此粘贴流水文本……（每一行形如：12 2024-05-15 12:00:00 代发工资 C 15248.00 39575.77 4000056… 公司户名 工资）";
+  ta.style.cssText = "width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical;";
+  body.appendChild(ta);
+  const btns = el("div", "");
+  btns.style.cssText = "display:flex;gap:10px;margin:12px 0;flex-wrap:wrap;align-items:center;";
+  const mkBtn = (id, label, primary) => { const b = el("button", "ffc-btn", label); b.id = id; b.style.cssText = primary ? "" : "background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;"; return b; };
+  btns.appendChild(mkBtn("impParse", "🔍 解析并预览", true));
+  btns.appendChild(mkBtn("impApply", "✅ 应用到报告", false));
+  btns.appendChild(mkBtn("impClear", "🗑 清除导入数据", false));
+  const status = el("span", "", ""); status.id = "impStatus";
+  status.style.cssText = "font-size:13px;color:var(--sub);";
+  btns.appendChild(status);
+  body.appendChild(btns);
+  const prev = el("div", "", ""); prev.id = "impPreview";
+  body.appendChild(prev);
+  d.appendChild(body);  /* 先入树，再绑事件（下方局部查询依赖 d 已包含 body） */
+  /* 交互（注意：此时 d 尚未入文档，须用局部查询而非 getElementById） */
+  let lastTxns = null, lastRules = null;
+  const q = (sel) => d.querySelector(sel);
+  const readRules = () => ({
+    employer: q("#impEmployer").value.trim() || imp.employer,
+    salaryAbstract: imp.salaryAbstract,
+    subsidyKeywords: q("#impSubsidy").value.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+    skipTypes: imp.skipTypes,
+    bonusMin: parseFloat(q("#impBonus").value) || imp.bonusMin,
+    bigExpenseMin: parseFloat(q("#impBig").value) || imp.bigExpenseMin
+  });
+  const showPreview = (txns, rules) => {
+    const ag = aggregate(txns, rules);
+    const blocks = buildImportBlocks(ag, rules);
+    lastTxns = txns; lastRules = rules;
+    q("#impStatus").textContent = `解析出 ${txns.length} 笔（${blocks.span}）`;
+    const prev = q("#impPreview");
+    prev.innerHTML = "";
+    const pv = el("details", "sub");
+    pv.appendChild(el("summary", "", "解析预览（将写入 2.1 / 2.2 / 2.3）<span class=\"chev\">▼</span>"));
+    const pb = el("div", "sub-body");
+    renderBlocks(pb, [...blocks.b21, ...blocks.b22, ...blocks.b23]);
+    pv.appendChild(pb); prev.appendChild(pv);
+  };
+  q("#impParse").addEventListener("click", () => {
+    const text = q("#impText").value;
+    const txns = parseStmtText(text);
+    if (!txns.length) { q("#impStatus").textContent = "未解析到流水行——请确认粘贴的是流水清单全文（含表头后的明细行）。"; return; }
+    showPreview(txns, readRules());
+  });
+  file.addEventListener("change", async () => {
+    const files = [...(file.files || [])];
+    if (!files.length) return;
+    const parts = [];
+    for (const f of files) {
+      if (/\.pdf$/i.test(f.name)) {
+        try {
+          parts.push(await extractPdfText(await f.arrayBuffer()));
+        } catch (e) {
+          q("#impStatus").textContent = "PDF 解析失败：" + e.message;
+          return;
+        }
+      } else {
+        parts.push(await f.text());
+      }
+    }
+    const text = parts.join("\n");
+    q("#impText").value = text;
+    const txns = parseStmtText(text);
+    if (!txns.length) { q("#impStatus").textContent = "文件里未解析到流水行。"; return; }
+    showPreview(txns, readRules());
+  });
+  q("#impApply").addEventListener("click", () => {
+    if (!lastTxns) { q("#impStatus").textContent = "请先「解析并预览」。"; return; }
+    applyImport(lastTxns, lastRules, true);
+  });
+  q("#impClear").addEventListener("click", () => {
+    localStorage.removeItem(LS_KEY);
+    q("#impStatus").textContent = "已清除本地导入数据；刷新页面后报告恢复为模板内容。";
+    q("#impPreview").innerHTML = "";
+  });
+  return d;
+}
+
+/* ---- footer + 启动 ---- */
+function renderFoot(){ $("footBox").textContent = DATA.meta.footer; }
+function bindInteractions(){
+  const fabLinks = Array.from(document.querySelectorAll('.fab a[data-part]'));
+  fabLinks.forEach(a => {
+    a.addEventListener('click', () => {
+      const block = document.getElementById(a.dataset.part);
+      if (block) block.querySelectorAll('details.sec').forEach(x => x.open = true);
+    });
+  });
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) fabLinks.forEach(l => l.classList.toggle('active', l.dataset.part === e.target.id));
+    });
+  }, { rootMargin: '-30% 0px -55% 0px' });
+  document.querySelectorAll('.pblock').forEach(b => spy.observe(b));
+}
+function boot(){
+  renderHero(); renderGuide(); renderOverview(); renderParts(); renderFoot(); bindInteractions();
+}
+/* 若本浏览器保存过用户数据（导入的 JSON），启动时覆盖示例数据 */
+(function restoreSavedData(){
+  try {
+    const raw = localStorage.getItem("FRI_DATA_V1");
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (obj && obj.data && obj.data.meta && Array.isArray(obj.data.parts)) Object.assign(DATA, obj.data);
+  } catch(e){}
+})();
+boot();
+/* 若本地存有上次导入的流水，恢复之（在 boot 之外仅执行一次，避免递归） */
+(function(){
+  const stored = loadStoredImport();
+  if (stored) applyImport(stored.txns, Object.assign({}, DATA.meta.importer, stored.rules), false);
+})();
+window.addEventListener('beforeprint', () => document.querySelectorAll('details.sec, details.sub').forEach(x => x.open = true));
+</script>
+</body>
+</html>

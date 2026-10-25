@@ -1,0 +1,18 @@
+# ===== 隐私保护：个人数据切勿提交 =====
+# 用户数据备份（导出的 JSON 含真实财务数据）
+*-data.json
+*-data.*.json
+# 银行流水与截图
+*.pdf
+*.jpg
+*.jpeg
+*.png
+!assets/*.png
+# 个人版本的报告文件
+my-report*.html
+private*.html
+
+# ===== 系统杂项 =====
+.DS_Store
+Thumbs.db
+desktop.ini

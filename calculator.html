@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>财富自由计算器</title>
+<style>
+:root{
+  --bg:#0a0e1a; --card:rgba(255,255,255,.045); --card2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.09); --tx:#e8ecf4; --tx2:#9aa4b8; --tx3:#6b7590;
+  --blue:#4f8cff; --green:#34d399; --purple:#a78bfa; --orange:#f5b04c; --teal:#14b8a6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6;padding-bottom:60px}
+main,header.hero,footer{max-width:960px;margin:0 auto;padding:0 20px}
+
+header.hero{padding:56px 20px 8px;text-align:center}
+.hero h1{font-size:34px;font-weight:800;letter-spacing:1px;
+  background:linear-gradient(120deg,#e8ecf4 30%,#4f8cff 70%,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .sub{color:var(--tx2);margin-top:6px;font-size:14px}
+.headline{margin:26px auto 0;padding:22px 24px;border:1px solid var(--line);border-radius:18px;
+  background:linear-gradient(160deg,rgba(79,140,255,.10),rgba(167,139,250,.06));
+  display:flex;flex-direction:column;gap:6px;align-items:center}
+.headline .lab{font-size:13px;color:var(--tx2);letter-spacing:2px}
+.headline .range{font-size:34px;font-weight:800;color:var(--tx)}
+.headline .range b{color:var(--blue)}
+.headline .note{font-size:12.5px;color:var(--tx3)}
+.headline .note a{color:var(--tx2);text-decoration:underline dotted;cursor:pointer}
+
+section{margin-top:34px}
+h2{font-size:17px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+h2::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(#4f8cff,#a78bfa)}
+.secdesc{font-size:13px;color:var(--tx3);margin-bottom:14px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+
+/* ---------- 模型公式 ---------- */
+.formulas{display:flex;flex-direction:column;gap:14px}
+.fline{display:flex;flex-direction:column;gap:5px;border-left:3px solid var(--line);padding-left:14px}
+.fline.t1c{border-color:var(--green)}.fline.t2c{border-color:var(--blue)}.fline.t3c{border-color:var(--orange)}
+.fline.shared{border-color:var(--tx3)}
+.fname{font-size:13px;font-weight:700}
+.t1c .fname{color:var(--green)}.t2c .fname{color:var(--blue)}.t3c .fname{color:var(--orange)}
+.shared .fname{color:var(--tx2)}
+.fline code{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:13px;color:var(--tx);
+  white-space:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.fline code::-webkit-scrollbar{height:5px}
+.fline code::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+.fline code.sub{font-size:12px;color:var(--tx2)}
+
+/* ---------- 输入区 ---------- */
+.igroup{margin-bottom:20px}
+.igroup:last-child{margin-bottom:0}
+.igtitle{font-size:13px;color:var(--tx2);font-weight:700;letter-spacing:1px;margin-bottom:10px}
+.igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.field{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px 10px}
+.fhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fhead label{font-size:13px;color:var(--tx2)}
+.fhead .unit{font-size:11px;color:var(--tx3)}
+input[type=number]{background:transparent;border:none;border-bottom:1px dashed var(--line);color:var(--tx);
+  font-size:16px;font-weight:700;width:86px;text-align:right;font-family:inherit}
+input[type=number]:focus{outline:none;border-bottom-color:var(--blue)}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input[type=range]{width:100%;accent-color:var(--blue);margin-top:8px;cursor:pointer}
+.fhint{font-size:11px;color:var(--tx3);margin-top:4px;min-height:15px}
+.reset{margin-top:14px;text-align:right}
+.reset button{background:transparent;border:1px solid var(--line);color:var(--tx2);border-radius:8px;
+  padding:5px 14px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.reset button:hover{border-color:var(--blue);color:var(--tx)}
+
+/* ---------- 账单通胀表 ---------- */
+details.basket{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:0;overflow:hidden}
+details.basket summary{cursor:pointer;padding:15px 20px;font-size:14px;font-weight:600;list-style:none;
+  display:flex;justify-content:space-between;align-items:center}
+details.basket summary::-webkit-details-marker{display:none}
+details.basket summary .pv{font-weight:800;color:var(--orange)}
+details.basket summary::after{content:"▾";color:var(--tx3);transition:transform .2s}
+details.basket[open] summary::after{transform:rotate(180deg)}
+details.basket .bwrap{padding:0 20px 18px}
+.tblwrap{overflow-x:auto;scrollbar-width:thin}
+.tblwrap::-webkit-scrollbar{height:5px}
+.tblwrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{color:var(--tx3);font-weight:500;text-align:right;padding:8px 10px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+td{padding:8px 10px;text-align:right;border-bottom:1px dashed rgba(255,255,255,.05)}
+tr.total td{border-bottom:none;font-weight:800;color:var(--orange);font-size:14.5px}
+td .anchor{color:var(--tx3);font-size:12px}
+
+/* ---------- 三档 ---------- */
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.tier{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.tier::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.tier.t1::before{background:var(--green)} .tier.t2::before{background:var(--blue)} .tier.t3::before{background:var(--orange)}
+.tname{font-size:14.5px;font-weight:700;line-height:1.45;min-height:42px}
+.t1 .tname{color:var(--green)} .t2 .tname{color:var(--blue)} .t3 .tname{color:var(--orange)}
+.tnum{font-size:36px;font-weight:800;letter-spacing:.5px}
+.tnum small{font-size:14px;color:var(--tx3);font-weight:500;margin-left:6px}
+.tbar{height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
+.tbar i{display:block;height:100%;border-radius:3px;width:0;transition:width .4s}
+.t1 .tbar i{background:var(--green)} .t2 .tbar i{background:var(--blue)} .t3 .tbar i{background:var(--orange)}
+details.calc{margin-top:auto;border-top:1px dashed var(--line);padding-top:8px}
+details.calc summary{cursor:pointer;font-size:12.5px;color:var(--tx3);list-style:none}
+details.calc summary::-webkit-details-marker{display:none}
+details.calc summary::before{content:"▸ ";color:var(--tx3)}
+details.calc[open] summary::before{content:"▾ "}
+details.calc .tbody{padding:10px 0 2px;display:flex;flex-direction:column;gap:4px;overflow-x:auto;scrollbar-width:thin}
+.tbody::-webkit-scrollbar{height:5px}
+.tbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+.tbody::-webkit-scrollbar-track{background:transparent}
+.frow{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.frow .flab{flex:0 0 62px;color:var(--tx3);font-size:11px}
+.frow .fexp{flex:1 1 auto;text-align:right;font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12px;color:var(--tx2)}
+.fexp b{font-weight:700;color:var(--tx)}
+.t1 .fexp b{color:var(--green)}.t2 .fexp b{color:var(--blue)}.t3 .fexp b{color:var(--orange)}
+.frow.grand{border-top:1px solid var(--line);padding-top:6px;margin-top:3px}
+.frow.grand .fexp b{font-size:14.5px}
+.fnote{font-size:11px;color:var(--tx3);line-height:1.55;white-space:normal;padding-top:3px}
+.warn{color:var(--orange);font-size:13px;font-weight:600}
+.fexp .warn{font-size:12px;font-weight:700}
+
+/* ---------- 敏感性曲线 ---------- */
+.chartcard{padding:20px}
+svg{width:100%;height:auto;display:block}
+svg text{fill:var(--tx3);font-size:11px;font-family:inherit}
+.caption{font-size:12.5px;color:var(--tx3);margin-top:10px}
+
+/* ---------- 附录 ---------- */
+details.glos{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0;margin-bottom:12px;overflow:hidden}
+details.glos summary{cursor:pointer;padding:15px 20px;font-size:14px;font-weight:600;list-style:none;position:relative}
+details.glos summary::-webkit-details-marker{display:none}
+details.glos summary::after{content:"+";position:absolute;right:20px;color:var(--tx3);font-size:17px;transition:transform .2s}
+details.glos[open] summary::after{content:"−"}
+details.glos .gbody{padding:0 20px 18px;font-size:13.5px;color:var(--tx2);display:flex;flex-direction:column;gap:10px;overflow-x:auto}
+.gbody b{color:var(--tx)}
+.gbody .frm{background:rgba(79,140,255,.08);border:1px solid rgba(79,140,255,.18);border-radius:8px;
+  padding:8px 14px;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#bcd2ff;overflow-x:auto}
+.gbody table{font-size:12.5px}
+
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--tx3);
+  display:flex;flex-direction:column;gap:4px;text-align:center}
+
+@media(max-width:640px){
+  header.hero{padding-top:32px}
+  .hero h1{font-size:25px}
+  section{margin-top:26px}
+  .card{padding:14px}
+  .igrid{gap:10px}
+  .field{padding:10px 12px 8px}
+  .tier{padding:16px}
+  .tname{font-size:13.5px;min-height:38px}
+  .tnum{font-size:28px}
+  .frow .flab{flex:0 0 52px;font-size:10.5px}
+  .frow .fexp{font-size:11px}
+  .frow.grand .fexp b{font-size:13px}
+  .fnote{font-size:10.5px}
+  .fline code{font-size:12px}
+  .fline code.sub{font-size:11px}
+  .bwrap{padding:0 12px 14px}
+  .tblwrap{margin:0 -2px}
+  th,td{padding:6px;font-size:12px}
+  details.basket summary,details.glos summary{padding:13px 14px;font-size:13.5px}
+  details.glos .gbody{padding:0 14px 14px}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>财富自由计算器</h1>
+  <p class="sub">真实购买力口径 · 三档模型对照 · 参数全部可调</p>
+</header>
+
+<main>
+
+<!-- ================= 模型公式 ================= -->
+<section>
+  <h2>三档模型公式</h2>
+  <p class="secdesc">三个档位的完整定义，不含任何数据；符号含义与模型差异见页面底部<a href="#notes" style="color:var(--tx2)">《模型说明》</a></p>
+  <div class="card formulas">
+    <div class="fline t1c">
+      <span class="fname">提取率模型 · 本金允许慢慢花</span>
+      <code>本金需求 = 年支出 ÷ 提取率 + 专项支出</code>
+    </div>
+    <div class="fline t2c">
+      <span class="fname">本金不动 · 物价按CPI</span>
+      <code>本金需求 = 年支出 ÷ (长期收益率 − 通胀率) + 专项支出</code>
+    </div>
+    <div class="fline t3c">
+      <span class="fname">本金不动 · 物价按个人账单</span>
+      <code>本金需求 = 年支出 ÷ 真实收益率 + 专项支出</code>
+      <code class="sub">真实收益率 = (1 + 长期收益率) ÷ (1 + 个人账单通胀) − 1</code>
+      <code class="sub">个人账单通胀 = 房租权重×房租通胀 + 饮食权重×饮食通胀 + 医疗权重×医疗通胀 + 其他权重×其他通胀</code>
+    </div>
+    <div class="fline shared">
+      <span class="fname">专项支出（三档通用）</span>
+      <code>专项支出 = 育儿池现值 + 健康池原值 + 重大投入现值</code>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 三档结果 ================= -->
+<section>
+  <h2>三档本金需求</h2>
+  <p class="secdesc">在下方「我的参数」里调整，这里实时更新；名称里的数字随参数变化，三档计算式联动展开</p>
+  <div class="tiers">
+    <div class="tier t1">
+      <div class="tname" id="t1name">—</div>
+      <div class="tnum"><span id="t1num">—</span><small>本金</small></div>
+      <div class="tbar"><i id="t1bar"></i></div>
+      <details class="calc"><summary>展开计算式</summary><div class="tbody" id="t1body"></div></details>
+    </div>
+    <div class="tier t2">
+      <div class="tname" id="t2name">—</div>
+      <div class="tnum"><span id="t2num">—</span><small>本金</small></div>
+      <div class="tbar"><i id="t2bar"></i></div>
+      <details class="calc"><summary>展开计算式</summary><div class="tbody" id="t2body"></div></details>
+    </div>
+    <div class="tier t3">
+      <div class="tname" id="t3name">—</div>
+      <div class="tnum"><span id="t3num">—</span><small>本金</small></div>
+      <div class="tbar"><i id="t3bar"></i></div>
+      <details class="calc"><summary>展开计算式</summary><div class="tbody" id="t3body"></div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 输入 ================= -->
+<section>
+  <h2>我的参数</h2>
+  <p class="secdesc">拖动滑块或直接输入，所有结果实时联动</p>
+
+  <div class="card">
+    <div class="igroup">
+      <div class="igtitle">生活支出</div>
+      <div class="igrid">
+        <div class="field">
+          <div class="fhead"><label>月支出</label><input type="number" id="spendN" value="10000" min="1000" step="500"><span class="unit">元/月</span></div>
+          <input type="range" id="spend" min="3000" max="50000" step="500" value="10000">
+          <div class="fhint">财富自由后希望维持的生活水平</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>其中：房租</label><input type="number" id="rentN" value="4000" min="0" step="100"><span class="unit">元/月</span></div>
+          <input type="range" id="rent" min="2000" max="8000" step="100" value="4000">
+          <div class="fhint">实际区间 3,000 ~ 5,000，默认取 4,000 留余量</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>饮食占比</label><input type="number" id="foodPctN" value="25" min="0" max="60" step="1"><span class="unit">% 月支出</span></div>
+          <input type="range" id="foodPct" min="5" max="50" step="1" value="25">
+          <div class="fhint">一日三餐与日常饮食开支的比例</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>医疗占比</label><input type="number" id="medPctN" value="10" min="0" max="40" step="1"><span class="unit">% 月支出</span></div>
+          <input type="range" id="medPct" min="0" max="30" step="1" value="10">
+          <div class="fhint">日常医疗保健（体检、药品）；老年大额医疗走健康池</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="igroup">
+      <div class="igtitle">市场假设</div>
+      <div class="igrid">
+        <div class="field">
+          <div class="fhead"><label>长期收益率</label><input type="number" id="rN" value="4" min="0" max="15" step="0.1"><span class="unit">% / 年</span></div>
+          <input type="range" id="r" min="1" max="8" step="0.1" value="4">
+          <div class="fhint">组合的长期年化收益，含波动换取</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>通货膨胀率（CPI）</label><input type="number" id="cpiN" value="2" min="0" max="10" step="0.1"><span class="unit">% / 年</span></div>
+          <input type="range" id="cpi" min="0" max="6" step="0.1" value="2">
+          <div class="fhint">官方物价涨幅；中国 2000 年以来均值约 2%</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>提取率</label><input type="number" id="swrN" value="3.5" min="1" max="8" step="0.1"><span class="unit">% / 年</span></div>
+          <input type="range" id="swr" min="2" max="6" step="0.1" value="3.5">
+          <div class="fhint">每年从本金提取的比例，默认参照中国市场 3~3.5%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="igroup">
+      <div class="igtitle">家庭与专项</div>
+      <div class="igrid">
+        <div class="field">
+          <div class="fhead"><label>小孩数量</label><input type="number" id="kidsN" value="0" min="0" max="6" step="1"><span class="unit">个</span></div>
+          <input type="range" id="kids" min="0" max="3" step="1" value="0">
+          <div class="fhint"></div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>每孩成本</label><input type="number" id="childCostN" value="108" min="1" step="2"><span class="unit">万</span></div>
+          <input type="range" id="childCost" min="20" max="400" step="2" value="108">
+          <div class="fhint">默认 108 万：《中国生育成本报告》上海 · 备孕至 18 岁平均</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>健康开销</label><input type="number" id="healthN" value="60" min="0" step="5"><span class="unit">万</span></div>
+          <input type="range" id="health" min="0" max="300" step="5" value="60">
+          <div class="fhint">老年医疗储备，按原值计入（见模型说明）</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>重大投入</label><input type="number" id="investN" value="0" min="0" step="5"><span class="unit">万</span></div>
+          <input type="range" id="invest" min="0" max="1000" step="5" value="0">
+          <div class="fhint">买房、创业等一次性大额支出；不买房为 0</div>
+        </div>
+        <div class="field">
+          <div class="fhead"><label>重大投入发生时间</label><input type="number" id="investYearsN" value="0" min="0" max="30" step="1"><span class="unit">年后</span></div>
+          <input type="range" id="investYears" min="0" max="30" step="1" value="0">
+          <div class="fhint">金额为 0 时无效；未来支出会先折现</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reset"><button id="resetBtn">恢复默认参数</button></div>
+  </div>
+</section>
+
+<!-- ================= 个人账单通胀 ================= -->
+<section>
+  <h2>我的账单通胀</h2>
+  <p class="secdesc">CPI 是全社会的平均篮子，你的钱按自己的篮子贬值 —— 这是三档中第三档的分母来源</p>
+  <details class="basket" id="basketBox">
+    <summary>个人账单通胀 π = <span class="pv" id="piShow">—</span>（点开看分类构成）</summary>
+    <div class="bwrap">
+      <div class="tblwrap">
+      <table>
+        <thead><tr><th>类别</th><th>月均金额</th><th>权重</th><th>通胀锚点</th></tr></thead>
+        <tbody>
+          <tr><td>房租</td><td id="bRentA">—</td><td id="bRentW">—</td><td><span class="anchor" id="bRentG">—</span></td></tr>
+          <tr><td>饮食</td><td id="bFoodA">—</td><td id="bFoodW">—</td><td><span class="anchor" id="bFoodG">—</span></td></tr>
+          <tr><td>医疗保健</td><td id="bMedA">—</td><td id="bMedW">—</td><td><span class="anchor" id="bMedG">—</span></td></tr>
+          <tr><td>其他生活</td><td id="bOtherA">—</td><td id="bOtherW">—</td><td><span class="anchor" id="bOtherG">—</span></td></tr>
+          <tr class="total"><td>个人账单通胀 π</td><td></td><td></td><td id="bTotal">—</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="caption" style="margin-top:10px">锚点为预置历史经验值（房租≈CPI+0.5pp、饮食≈CPI−0.5pp、医疗≈CPI+2.5pp、其他≈CPI），会不定期按最新数据更新。房租按金额、饮食与医疗按「我的参数」里的占比计入，扣除三者后其余归入其他生活。</p>
+    </div>
+  </details>
+</section>
+
+<!-- ================= 敏感性曲线 ================= -->
+<section>
+  <h2>真实收益率敏感性</h2>
+  <p class="secdesc">同一个模型，真实收益率差一点，本金需求差很多</p>
+  <div class="card chartcard">
+    <svg id="chart" viewBox="0 0 640 280" preserveAspectRatio="xMidYMid meet"></svg>
+    <p class="caption">横轴：真实收益率（收益率减去你账单通胀后的净增速）；纵轴：仅生活池所需本金（不含育儿、健康、重大投入）。圆点为当前参数位置。</p>
+  </div>
+</section>
+
+<!-- ================= 模型说明（附录） ================= -->
+<section id="notes">
+  <h2>模型说明</h2>
+  <p class="secdesc">想知道上面三档名字是什么意思、数字怎么来的，从这里翻阅</p>
+
+  <details class="glos">
+    <summary>「提取率 3.5% · 本金允许慢慢花」是什么意思？</summary>
+    <div class="gbody">
+      <p>这套模型<b>允许本金被消耗</b>：每年从总本金里提取固定比例当生活费，投资收益覆盖大部分，缺口从本金里出。学术名叫「安全提取率」（SWR），源于对美国股市上百年历史数据的回测：只要提取率不超过某个值，哪怕经历大萧条、高通胀，本金也能撑过 30 年以上的提取期。</p>
+      <p>美股历史回测出的经典数字是 <b>4%</b>（即著名的「4% 法则」）；中国股市波动更大、可靠历史更短，所以通常打折到 <b>3%~3.5%</b>。提取率越低，撑的时间越接近"永久"，需要的本金也越多。</p>
+      <div class="frm">本金 = 年支出 ÷ 提取率 + 专项支出<br>例：12万 ÷ 3.5% = 343万</div>
+      <p>它是三档里数字最低的一档，代价是：<b>不是严格意义上的"永远"</b>，赌的是历史规律会重演。</p>
+    </div>
+  </details>
+
+  <details class="glos">
+    <summary>「本金不动 · 物价按 CPI」是什么意思？</summary>
+    <div class="gbody">
+      <p>这套模型要求<b>本金永远花不完</b>（永续模型）：投资收益分成两份，一份覆盖当年开销，一份追上物价上涨，本金本身的购买力一百年后和今天一样。</p>
+      <div class="frm">本金 = 年支出 ÷ (长期收益率 − 通胀率)<br>例：12万 ÷ (4% − 2%) = 600万</div>
+      <p>它对「收益率减通胀」的差值极其敏感。收益率按 4% 算时：</p>
+      <table>
+        <thead><tr><th>通胀率</th><th>0%</th><th>1%</th><th>2%</th><th>3%</th><th>≥4%</th></tr></thead>
+        <tbody><tr><td>仅生活池所需</td><td>300万</td><td>400万</td><td>600万</td><td>1,200万</td><td class="warn">公式失效</td></tr></tbody>
+      </table>
+      <p><b>收益率不高于通胀时，"本金不动"在数学上不可能实现</b>——这正是日本过去三十年的教训：物价不涨，但利率和回报也趴在地板上。</p>
+    </div>
+  </details>
+
+  <details class="glos">
+    <summary>「物价按个人账单」又是什么？为什么不是 CPI？</summary>
+    <div class="gbody">
+      <p>CPI 衡量的是全体居民的平均消费篮子，但<b>每个人被涨价伤害的程度取决于自己买什么</b>。不买房、要育儿、要养老医疗的人，体感通胀通常高于 CPI——因为居住、教育、医疗这三类的长期涨幅都跑赢整体物价。</p>
+      <p>本计算器把你的月支出拆成四类，各自挂一个通胀锚点，加权出「个人账单通胀 π」：</p>
+      <table>
+        <thead><tr><th>类别</th><th>通胀锚点</th><th>依据</th></tr></thead>
+        <tbody>
+          <tr><td>房租</td><td>CPI + 0.5pp</td><td>一线城市居住成本长期略高于整体物价</td></tr>
+          <tr><td>饮食</td><td>CPI − 0.5pp</td><td>食品占篮子比重随富裕下降，长期温和</td></tr>
+          <tr><td>医疗保健</td><td>CPI + 2.5pp</td><td>医疗服务价格常年领涨</td></tr>
+          <tr><td>其他生活</td><td>≈ CPI</td><td>日用品、交通、服务，接近整体水平</td></tr>
+        </tbody>
+      </table>
+      <p>然后分母不再用「收益率 − CPI」，而用<b>真实收益率</b>：</p>
+      <div class="frm">真实收益率 = (1 + 长期收益率) ÷ (1 + 个人账单通胀) − 1</div>
+      <p>π 比 CPI 高，真实收益率就低，所需本金就多——这一档是对「我的钱比统计数字贬得快」的防御。</p>
+    </div>
+  </details>
+
+  <details class="glos">
+    <summary>为什么育儿成本要"折现"，健康开销却按原值？</summary>
+    <div class="gbody">
+      <p><b>育儿成本（108 万/孩）不是今天一次掏出来的</b>，而是摊在备孕到 18 岁的漫长岁月里。这笔钱放进组合里会先赚十几二十年收益，所以按支出时间线折现后，每孩实际占用的本金低于 108 万（按默认参数约 93 万）。孩子数量大于 0 时，计算器自动按折现值计入。</p>
+      <p><b>健康开销（60 万）按原值计入、不折现</b>，是刻意保守：医疗通胀长期高于 CPI 且波动大，老年医疗支出时点与金额都很不确定。它的定位是"吸收不确定性的缓冲垫"，假装能精确折现反而危险。</p>
+    </div>
+  </details>
+
+  <details class="glos">
+    <summary>收益率和通胀为什么要放在一起调？</summary>
+    <div class="gbody">
+      <p>所有档位的分母看的都是<b>两者的差</b>（或真实收益率），不是任何一个单独的数。上调收益率和下调通胀对结果的影响是一样的。</p>
+      <p>更关键的是两者<b>不是独立的</b>：低通胀的时代往往伴随低利率、低回报（见日本），高通胀时代名义回报通常也水涨船高。所以"通胀降到 0 但收益维持 4%"这种组合在历史上很少见——调整参数时请成对、成情景地想，而不是把两个滑块各自推到最乐观的位置。</p>
+    </div>
+  </details>
+
+  <details class="glos">
+    <summary>数据与默认值来源</summary>
+    <div class="gbody">
+      <p><b>每孩成本 108 万</b>：《中国生育成本报告》上海口径，备孕至 18 岁平均养育成本。</p>
+      <p><b>通胀锚点</b>：基于中国国家统计局 1980 年以来 CPI 序列的研究结论——1980~2025 年物价累计约 7 倍、年均约 4.4%；2000 年以来年均约 2.0%；2023 年 +0.2%、2024 年 +0.2%、2025 年持平。分类锚点（房租/饮食/医疗相对 CPI 的差值）为长期经验值。</p>
+      <p>锚点会不定期按最新通胀数据更新，更新后本页默认值同步调整。</p>
+    </div>
+  </details>
+</section>
+
+</main>
+
+<footer>
+  <div>所有计算在你的浏览器本地完成，不联网、不上传任何数据</div>
+  <div>构建于 2026-10-25 · 通胀锚点更新于 2026-10</div>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const DEFAULTS = {spend:10000, rent:4000, foodPct:25, medPct:10, r:4, cpi:2, swr:3.5, kids:0, childCost:108, health:60, invest:0, investYears:0};
+const FIELDS = Object.keys(DEFAULTS);
+
+function fmtInt(n){ return Math.round(n).toLocaleString('zh-CN'); }
+function wan(x, dec){
+  if(!isFinite(x)) return null;
+  if(x >= 10000) return (x/10000).toFixed(2) + '亿';
+  if(dec === undefined) dec = x >= 100 ? 0 : 1;
+  return x.toFixed(dec).replace(/\.0$/, '') + '万';
+}
+function annuity(n, rr){ return rr <= 1e-9 ? n : (1 - Math.pow(1+rr, -n)) / rr; }
+
+function readNum(id){ const v = parseFloat($(id+'N').value); return isFinite(v) ? v : 0; }
+
+function bind(key){
+  const rng = $(key), num = $(key+'N');
+  rng.addEventListener('input', () => { num.value = rng.value; recalc(); });
+  num.addEventListener('input', () => { const v = parseFloat(num.value); if(isFinite(v)) rng.value = v; recalc(); });
+}
+FIELDS.forEach(bind);
+
+/* 三档计算式联动展开：开一个，三个同步 */
+const calcDetails = [...document.querySelectorAll("details.calc")];
+let syncLock = false;
+calcDetails.forEach(d => d.addEventListener("toggle", () => {
+  if (syncLock) return;
+  syncLock = true;
+  calcDetails.forEach(o => { if (o !== d) o.open = d.open; });
+  syncLock = false;
+}));
+
+$('resetBtn').addEventListener('click', () => {
+  FIELDS.forEach(k => { $(k).value = DEFAULTS[k]; $(k+'N').value = DEFAULTS[k]; });
+  recalc();
+});
+
+let LAST = null;
+
+function recalc(){
+  const p = {};
+  FIELDS.forEach(k => p[k] = readNum(k));
+  if(p.spend < 500) p.spend = 500;
+
+  /* ---- 个人账单通胀 ---- */
+  const food = p.spend * p.foodPct / 100, med = p.spend * p.medPct / 100;
+  const other = Math.max(p.spend - p.rent - food - med, 0);
+  const gRent = p.cpi + 0.5, gFood = p.cpi - 0.5, gMed = p.cpi + 2.5, gOther = p.cpi;
+  const pi = (p.rent*gRent + food*gFood + med*gMed + other*gOther) / p.spend;   // %
+  const rReal = (1 + p.r/100) / (1 + pi/100) - 1;                                // 小数
+
+  $('piShow').textContent = pi.toFixed(2) + '%';
+  $('bRentA').textContent = fmtInt(p.rent) + ' 元';  $('bRentW').textContent = (p.rent/p.spend*100).toFixed(1) + '%';  $('bRentG').textContent = 'CPI+0.5pp → ' + gRent.toFixed(1) + '%';
+  $('bFoodA').textContent = fmtInt(food) + ' 元';    $('bFoodW').textContent = (food/p.spend*100).toFixed(1) + '%';    $('bFoodG').textContent = 'CPI−0.5pp → ' + gFood.toFixed(1) + '%';
+  $('bMedA').textContent  = fmtInt(med) + ' 元';     $('bMedW').textContent  = (med/p.spend*100).toFixed(1) + '%';     $('bMedG').textContent  = 'CPI+2.5pp → ' + gMed.toFixed(1) + '%';
+  $('bOtherA').textContent= fmtInt(other) + ' 元';   $('bOtherW').textContent= (other/p.spend*100).toFixed(1) + '%';   $('bOtherG').textContent= '≈CPI → ' + gOther.toFixed(1) + '%';
+  $('bTotal').textContent = pi.toFixed(2) + '%';
+
+  /* ---- 专项池 ---- */
+  const ySpend = p.spend * 12 / 10000;                                  // 万/年
+  const childPV = (p.childCost/18) * annuity(18, rReal);                // 万/孩，已折现
+  const investPV = p.invest / Math.pow(1 + Math.max(rReal,0), p.investYears); // 万
+  const pools1 = p.kids * childPV + p.health + investPV;
+
+  /* ---- 三档 ---- */
+  const wpct = x => x.toFixed(1).replace(/\.0$/, '') + '%';
+  const wR = wpct(p.rent/p.spend*100), wF = wpct(food/p.spend*100),
+        wM = wpct(med/p.spend*100),  wO = wpct(other/p.spend*100);
+  const childExp = `${p.kids} 孩 × 每孩 ${wan(childPV,1)}`;
+  const healthExp = `${wan(p.health,0)}（原值）`;
+  let investExp;
+  if (p.invest <= 0) investExp = `0`;
+  else if (p.investYears <= 0) investExp = `${wan(p.invest,0)}（当期）`;
+  else if (rReal <= 0) investExp = `${wan(p.invest,0)}（真实收益率≤0，不折现）`;
+  else investExp = `${wan(p.invest,0)} ÷ (1+${(rReal*100).toFixed(2)}%)^${p.investYears}`;
+  const lifeRes = v => isFinite(v) ? wan(v,0) : `<span class="warn">分母≤0</span>`;
+  const childNote = rReal > 0
+    ? `注：每孩 ${wan(childPV,1)} = (每孩成本÷18年) 摊到18年的年金现值，已按真实收益率 ${(rReal*100).toFixed(2)}% 折现；健康池按原值不折现。`
+    : `注：真实收益率≤0，育儿按原值 ${wan(childPV,1)} 计入；健康池按原值不折现。`;
+
+  const tiers = [];
+  // T1 提取率
+  const t1life = p.swr > 0 ? ySpend / (p.swr/100) : Infinity;
+  tiers.push({
+    name: `提取率 ${p.swr.toFixed(1)}% · 本金允许慢慢花`,
+    life: t1life, total: t1life + pools1,
+    rows: [
+      ['生活池', `${wan(ySpend,0)} ÷ ${p.swr.toFixed(1)}%`, lifeRes(t1life)],
+      ['育儿池', childExp, wan(p.kids*childPV,0)],
+      ['健康池', healthExp, wan(p.health,0)],
+      ['重大投入', investExp, wan(investPV,0)]
+    ]
+  });
+  // T2 本金不动 + CPI
+  const t2den = p.r/100 - p.cpi/100;
+  const t2life = t2den > 1e-6 ? ySpend / t2den : Infinity;
+  tiers.push({
+    name: `本金不动 · 物价按 CPI ${p.cpi.toFixed(1)}%`,
+    life: t2life, total: t2life + pools1,
+    rows: [
+      ['生活池', `${wan(ySpend,0)} ÷ (${p.r.toFixed(1)}% − ${p.cpi.toFixed(1)}%)`, lifeRes(t2life)],
+      ['育儿池', childExp, wan(p.kids*childPV,0)],
+      ['健康池', healthExp, wan(p.health,0)],
+      ['重大投入', investExp, wan(investPV,0)]
+    ]
+  });
+  // T3 本金不动 + 个人账单
+  const t3life = rReal > 1e-6 ? ySpend / rReal : Infinity;
+  tiers.push({
+    name: `本金不动 · 物价按个人账单 ${pi.toFixed(1)}%`,
+    life: t3life, total: t3life + pools1,
+    rows: [
+      ['账单通胀π', `${wR}×${gRent.toFixed(1)}% + ${wF}×${gFood.toFixed(1)}% + ${wM}×${gMed.toFixed(1)}% + ${wO}×${gOther.toFixed(1)}%`, pi.toFixed(2)+'%'],
+      ['真实收益率', `(1+${p.r.toFixed(1)}%) ÷ (1+${pi.toFixed(2)}%) − 1`, (rReal*100).toFixed(2)+'%'],
+      ['生活池', `${wan(ySpend,0)} ÷ ${(rReal*100).toFixed(2)}%`, lifeRes(t3life)],
+      ['育儿池', childExp, wan(p.kids*childPV,0)],
+      ['健康池', healthExp, wan(p.health,0)],
+      ['重大投入', investExp, wan(investPV,0)]
+    ]
+  });
+
+  tiers.forEach((t, i) => {
+    const n = i + 1;
+    $(`t${n}name`).textContent = t.name;
+    if(t.total === Infinity || !isFinite(t.total)){
+      $(`t${n}num`).outerHTML = `<span id="t${n}num" class="warn">无法实现</span>`;
+    } else {
+      const el = $(`t${n}num`);
+      if(el.className === 'warn') el.className = '';
+      el.textContent = wan(t.total, 0);
+    }
+    $(`t${n}body`).innerHTML = t.rows.map(r =>
+      `<div class="frow"><span class="flab">${r[0]}</span><span class="fexp">${r[1]} = <b>${r[2]}</b></span></div>`
+    ).join('')
+    + (isFinite(t.total)
+      ? `<div class="frow grand"><span class="flab">合计</span><span class="fexp">= <b>${wan(t.total,0)}</b></span></div>`
+      : '')
+    + `<div class="fnote">${childNote}</div>`;
+  });
+
+  const maxTotal = Math.max(...tiers.map(t => isFinite(t.total) ? t.total : 0), 1);
+  tiers.forEach((t, i) => {
+    $(`t${i+1}bar`).style.width = (isFinite(t.total) ? t.total/maxTotal*100 : 0) + '%';
+  });
+
+  drawChart(ySpend, rReal);
+  LAST = p;
+}
+
+/* ---- 敏感性曲线 ---- */
+function drawChart(ySpend, rRealNow){
+  const W=640, H=280, L=58, R=16, T=14, B=34;
+  const pw = W-L-R, ph = H-T-B;
+  const XMAX = 0.04, YMAX = 1600;
+  const X = rr => L + rr/XMAX*pw;
+  const Y = v  => T + (1 - Math.min(v,YMAX)/YMAX)*ph;
+
+  let d = '', started = false;
+  for(let rr = 0.0015; rr <= XMAX + 1e-9; rr += 0.0001){
+    const v = ySpend / rr;
+    if(v > YMAX){ started = false; continue; }
+    d += (started ? 'L' : 'M') + X(rr).toFixed(1) + ' ' + Y(v).toFixed(1) + ' ';
+    started = true;
+  }
+
+  let s = `<line x1="${L}" y1="${T+ph}" x2="${L+pw}" y2="${T+ph}" stroke="rgba(255,255,255,.18)"/>`;
+  [400,800,1200,1600].forEach(v => {
+    s += `<line x1="${L}" y1="${Y(v)}" x2="${L+pw}" y2="${Y(v)}" stroke="rgba(255,255,255,.06)"/>` +
+         `<text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;
+  });
+  for(let i=0;i<=4;i++){
+    s += `<line x1="${X(i/100)}" y1="${T+ph}" x2="${X(i/100)}" y2="${T+ph+4}" stroke="rgba(255,255,255,.18)"/>` +
+         `<text x="${X(i/100)}" y="${T+ph+18}" text-anchor="middle">${i}%</text>`;
+  }
+  s += `<text x="${L+pw/2}" y="${H-4}" text-anchor="middle">真实收益率</text>`;
+  s += `<path d="${d}" fill="none" stroke="#4f8cff" stroke-width="2.2"/>`;
+
+  if(rRealNow > 0.0015 && rRealNow <= XMAX){
+    const v = ySpend / rRealNow;
+    if(v <= YMAX){
+      s += `<line x1="${X(rRealNow)}" y1="${Y(v)}" x2="${X(rRealNow)}" y2="${T+ph}" stroke="rgba(245,176,76,.45)" stroke-dasharray="3 3"/>`;
+      s += `<circle cx="${X(rRealNow)}" cy="${Y(v)}" r="4.5" fill="#f5b04c"/>`;
+      const anchor = X(rRealNow) > W-130 ? 'end' : 'start';
+      const dx = anchor === 'end' ? -8 : 8;
+      s += `<text x="${X(rRealNow)+dx}" y="${Math.max(Y(v)-8,14)}" text-anchor="${anchor}" fill="#f5b04c" style="fill:#f5b04c">当前 ${(rRealNow*100).toFixed(2)}% → ${wan(v,0)}</text>`;
+    }
+  }
+  $('chart').innerHTML = s;
+}
+
+recalc();
+
+/* —— 从资金报告导入参数（localStorage 桥，30 分钟内有效；置于脚本末尾避免 TDZ）—— */
+(function(){
+  let pre = null;
+  try { pre = JSON.parse(localStorage.getItem('FFC_PREFILL') || 'null'); } catch(e){}
+  if (!pre || !pre.fields) return;
+  if (Date.now() - (pre.ts || 0) > 30 * 60 * 1000) { localStorage.removeItem('FFC_PREFILL'); return; }
+  const applied = [];
+  Object.entries(pre.fields).forEach(([k, v]) => {
+    if (DEFAULTS[k] === undefined || !isFinite(v)) return;
+    $(k).value = v; $(k + 'N').value = v; applied.push(k);
+  });
+  if (!applied.length) return;
+  recalc();
+  const bar = document.createElement('div');
+  bar.style.cssText = 'margin:10px 0 0;padding:9px 14px;border:1px dashed var(--blue);border-radius:10px;font-size:13px;background:#f2f7ff;';
+  bar.innerHTML = '🧮 已从《' + (pre.label || '资金报告') + '》导入参数：' +
+    applied.join(' / ') + ' —— <a href="#" id="ffcReset" style="color:var(--blue)">恢复默认</a>';
+  document.querySelector('main').prepend(bar);
+  bar.querySelector('#ffcReset').addEventListener('click', e => {
+    e.preventDefault();
+    FIELDS.forEach(k => { $(k).value = DEFAULTS[k]; $(k + 'N').value = DEFAULTS[k]; });
+    recalc(); bar.remove(); localStorage.removeItem('FFC_PREFILL');
+  });
+})();
+</script>
+</body>
+</html>
