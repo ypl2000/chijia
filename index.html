@@ -118,6 +118,7 @@
       <div class="h-logo">持家 chijia</div>
       <div class="h-tag">本地优先的个人财务工作台——流水变报告，数据不出设备</div>
       <span class="h-lock">🔒 全部计算在本地完成，不上传任何数据</span>
+      <div class="h-build" style="font-size:10.5px;opacity:.55;margin-top:8px;">构建 v1.2 · 2026-10-25d</div>
     </div>
 
     <div class="step">
@@ -216,6 +217,10 @@ function go(target){
 }
 document.querySelectorAll("[data-go]").forEach(b =>
   b.addEventListener("click", () => go(b.dataset.go))
+);
+/* 底部 Tab 切换（此前遗漏绑定，导致四个 Tab 点击无反应） */
+document.querySelectorAll("nav.tabs button").forEach(b =>
+  b.addEventListener("click", () => activate(b.dataset.view))
 );
 
 /* 资金报告点「发送到财富自由计算器」→ 切到计算器 Tab */
