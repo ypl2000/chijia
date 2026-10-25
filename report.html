@@ -373,6 +373,42 @@
     .content{padding:0;max-width:none;}
     section,.hero,details.sec{box-shadow:none;border:1px solid var(--line);}
   }
+  /* ===== 深色模式（跟随系统）===== */
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#e8ecf5; --sub:#9aa3b5; --line:#2a3242; --bg:#11151d; --card:#1a2130;
+      --blue-soft:#1c2b45; --green-soft:#12301f; --orange-soft:#33270f;
+      --gray-soft:#20242c; --red-soft:#331a19;
+    }
+    body{background:var(--bg);}
+    .pic-card,.p1-rules,.pcard,.dist-card{background:var(--card);color:var(--ink);}
+    details.sub{background:var(--bg);}
+    details.sub > summary{color:var(--ink);}
+    details.sec > summary:hover{background:#1a2230;}
+    input[type=number],input[type=text]{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important;}
+    .btn,.ffc-btn{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important;}
+    .qbar{background:#252d3d;}
+    .callout{filter:brightness(.9);}
+    .stat-side{background:rgba(255,255,255,.06);}
+    footer{color:var(--sub);}
+  }
+  /* ===== 手机：表格粘性首列 + 最小宽 ===== */
+  @media (max-width:700px){
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tbl-wrap table{min-width:620px;}
+    .tbl-wrap th:first-child,.tbl-wrap td:first-child{position:sticky;left:0;background:var(--card);z-index:1;box-shadow:1px 0 0 var(--line);}
+    body.app-mode .fab{display:none!important;}
+  }
+  body.app-mode .fab{display:none!important;}
+  /* ===== 逐月表卡片化（<640px 自动切换）===== */
+  .cards12{display:grid;gap:10px;}
+  .card12{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);}
+  .c12h{font-weight:800;margin-bottom:6px;font-size:14px;}
+  .c12g{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin-bottom:6px;}
+  .c12i{display:flex;justify-content:space-between;font-size:12.5px;}
+  .c12i span{color:var(--sub);}
+  .c12e{font-size:12.5px;border-top:1px dashed var(--line);padding-top:6px;}
+  @media (min-width:641px){ .cards12{display:none!important;} }
 </style><style>
   .ffc-btn{
     background:rgba(255,255,255,.92);color:#22315c;border:1px solid rgba(255,255,255,.6);
@@ -799,7 +835,11 @@ function renderHero(){
         else if (/固定资产|车/.test(n)) p.consumer = (p.consumer || 0) + v;
       });
       try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields, portfolio: p, income: window.__INCOME || null })); } catch(e){}
-      window.open(m.calculator.file, "_blank");
+      if (window.parent !== window) {
+        try { window.parent.postMessage({ ffSwitch: "calculator" }, "*"); } catch(e){}
+      } else {
+        window.open(m.calculator.file, "_blank");
+      }
     });
     wrap.appendChild(btn);
     wrap.appendChild(el("span", "ffc-tip", m.calculator.tip || ""));
@@ -1786,8 +1826,36 @@ function bindInteractions(){
   document.querySelectorAll('.pblock').forEach(b => spy.observe(b));
 }
 function boot(){
+  if (location.search.indexOf("app=1") >= 0) document.body.classList.add("app-mode");
   renderHero(); renderGuide(); renderOverview(); renderParts(); renderFoot(); bindInteractions();
+  cardify12();
 }
+/* 窄屏：逐月执行表切换为「每月一卡」 */
+function cardify12(){
+  const wrap = document.querySelector("#sec-1-2 .tbl-wrap");
+  if (!wrap) return;
+  const table = wrap.querySelector("table");
+  const host = wrap.parentElement;
+  let cards = host.querySelector(".cards12");
+  const narrow = window.innerWidth < 640;
+  if (narrow && !cards){
+    const head = [...table.querySelectorAll("thead th")].map(x => x.textContent.trim());
+    cards = el("div", "cards12");
+    [...table.querySelectorAll("tbody tr")].forEach(tr => {
+      const c = tr.cells;
+      const card = el("div", "card12");
+      card.innerHTML = '<div class="c12h">' + c[0].textContent + '</div>' +
+        '<div class="c12g">' + [1, 2, 3, 4, 5].map(i => '<div class="c12i"><span>' + (head[i] || "") + '</span><b>' + c[i].textContent + '</b></div>').join("") + '</div>' +
+        '<div class="c12e">' + c[6].innerHTML + '</div>';
+      cards.appendChild(card);
+    });
+    host.appendChild(cards);
+    table.style.display = "none";
+  } else if (!narrow && cards){
+    cards.remove(); table.style.display = "";
+  }
+}
+window.addEventListener("resize", cardify12);
 /* 若本标签页会话中载入过数据包（导入的 JSON），启动时覆盖示例数据；
    数据一律会话级（sessionStorage）——关闭浏览器即回到示例，磁盘不留痕迹 */
 (function restoreSavedData(){

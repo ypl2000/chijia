@@ -8,6 +8,7 @@
 *.jpeg
 *.png
 !assets/*.png
+!icons/*.png
 # 个人版本的报告文件
 my-report*.html
 private*.html

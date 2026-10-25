@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#22315c">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png">
+<title>持家 chijia</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;display:flex;flex-direction:column;height:100%;
+    background:#f4f6fa;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    overscroll-behavior:none;
+  }
+  @media (prefers-color-scheme: dark){
+    body{background:#11151d;}
+  }
+  header.top{
+    flex:none;display:flex;align-items:center;gap:10px;
+    background:linear-gradient(135deg,#22315c 0%,#2f6fed 100%);
+    color:#fff;padding:8px 14px;
+  }
+  header.top .logo{font-weight:800;font-size:15px;letter-spacing:1px;}
+  header.top .sub{font-size:11px;opacity:.8;}
+  header.top .spacer{flex:1;}
+  header.top .lock{font-size:11px;opacity:.75;}
+  #installBtn{
+    display:none;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.15);
+    color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;
+  }
+  .views{flex:1;position:relative;overflow:hidden;background:#f4f6fa;}
+  @media (prefers-color-scheme: dark){ .views{background:#11151d;} }
+  .views iframe{
+    position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:transparent;
+  }
+  .views iframe.active{display:block;}
+  nav.tabs{
+    flex:none;display:flex;background:#22315c;color:#8f9bb3;
+    padding-bottom:env(safe-area-inset-bottom, 0);
+    box-shadow:0 -2px 10px rgba(0,0,0,.25);
+  }
+  nav.tabs button{
+    flex:1;background:none;border:none;color:inherit;font-family:inherit;
+    padding:8px 0 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;
+    font-size:11px;border-top:2px solid transparent;
+  }
+  nav.tabs button .ico{font-size:19px;line-height:1;}
+  nav.tabs button.active{color:#fff;border-top-color:#8fd3ff;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <span class="logo">持家 chijia</span>
+  <span class="sub">本地财务工作台</span>
+  <span class="spacer"></span>
+  <span class="lock">🔒 数据不出设备</span>
+  <button id="installBtn">📲 安装 APP</button>
+</header>
+
+<div class="views" id="views">
+  <iframe id="view-report" class="active" title="资金计划" src="./report.html?app=1"></iframe>
+</div>
+
+<nav class="tabs">
+  <button data-view="report" class="active"><span class="ico">📋</span>计划</button>
+  <button data-view="calculator"><span class="ico">🧮</span>计算器</button>
+  <button data-view="portfolio"><span class="ico">🧪</span>体检</button>
+</nav>
+
+<script>
+"use strict";
+const VIEWS = {
+  report:     { file: "./report.html?app=1",     title: "资金计划" },
+  calculator: { file: "./calculator.html?app=1", title: "财富自由计算器" },
+  portfolio:  { file: "./portfolio.html?app=1",  title: "组合体检" }
+};
+const created = { report: document.getElementById("view-report") };
+let active = "report";
+
+function activate(name){
+  if (!VIEWS[name]) return;
+  if (!created[name]) {
+    const f = document.createElement("iframe");
+    f.id = "view-" + name;
+    f.title = VIEWS[name].title;
+    f.src = VIEWS[name].file;
+    document.getElementById("views").appendChild(f);
+    created[name] = f;
+  }
+  Object.entries(created).forEach(([k, f]) => f.classList.toggle("active", k === name));
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+  active = name;
+}
+document.querySelectorAll("nav.tabs button").forEach(b =>
+  b.addEventListener("click", () => activate(b.dataset.view))
+);
+
+/* 资金报告点「发送到财富自由计算器」后，切到计算器 Tab（同 APP 内导航，不弹新窗） */
+window.addEventListener("message", e => {
+  if (e.data && e.data.ffSwitch && VIEWS[e.data.ffSwitch]) activate(e.data.ffSwitch);
+});
+
+/* PWA：注册 Service Worker + 安装入口（file:// 打开时自动跳过，功能不受影响） */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById("installBtn").style.display = "inline-block";
+});
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById("installBtn").style.display = "none";
+});
+</script>
+</body>
+</html>

@@ -82,6 +82,21 @@
   .status{font-size:12.5px;color:var(--sub);}
   footer{text-align:center;color:var(--sub);font-size:12px;padding:10px 16px 40px;}
   @media (max-width:640px){ .big{font-size:28px;} header{padding:24px 14px;} }
+  /* ===== 深色模式（跟随系统）===== */
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#e8ecf5; --sub:#9aa3b5; --line:#2a3242; --bg:#11151d; --card:#1a2130;
+      --blue-soft:#1c2b45; --green-soft:#12301f; --orange-soft:#33270f; --red-soft:#331a19;
+    }
+    body{background:var(--bg);}
+    .bucket{background:var(--card);}
+    .bucket.off{background:#151b26;}
+    input[type=number],input[type=text]{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important;}
+    .btn{background:var(--card)!important;color:var(--ink)!important;}
+    .rbar .bar{background:#252d3d;}
+    .light{background:var(--card);}
+    .card{background:var(--card);}
+  }
 </style>
 </head>
 <body>
