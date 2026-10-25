@@ -954,7 +954,7 @@ const FORMATS = {
     name: "交通银行 · 个人客户交易清单",
     // 行结构：序号 日期 时间 交易类型 C/D 金额 余额 对方账号 户名 摘要…
     re: /^\s*\d+\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\S+)\s+([CD])\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(\S+)\s+(.*)$/,
-    map: (m) => ({ d: m[1], t: m[3], dc: m[4], amt: parseFloat(m[5].replace(/,/g, "")), rest: (m[8] || "").trim() })
+    map: (m) => ({ d: m[1], t: m[3], dc: m[4], amt: parseFloat(m[5].replace(/,/g, "")), bal: parseFloat(m[6].replace(/,/g, "")), rest: (m[8] || "").trim() })
   }
 };
 
@@ -1075,6 +1075,49 @@ function buildImportBlocks(ag, rules){
   ];
   return { b21, b22, b23, span };
 }
+/* 把流水最后一笔余额同步进 Hero 指标与「现在」分布卡：银行行、总资产、净资产、
+   各行占比、堆叠条全部按新总额重建；其余资产不动。返回 {total, delta} 或 null */
+function applyBalance(balance){
+  if (!isFinite(balance) || balance < 0) return null;
+  const fmtB = n => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const num = s => parseFloat(String(s).replace(/[≈,]/g, "")) || 0;
+  const now = DATA.overview && DATA.overview.now;
+  const h = DATA.hero && DATA.hero.now;
+  if (!now || !h) return null;
+  const bankRow = now.rows.find(r => /银行|活期|现金/.test(r.name) && !r.muted);
+  const oldBank = bankRow ? num(bankRow.amt) : 0;
+  if (bankRow) bankRow.amt = fmtB(balance);
+  const assets = now.rows.filter(r => !r.muted && !r.neg);
+  const vals = assets.map(r => num(r.amt));
+  const total = vals.reduce((a, b) => a + b, 0);
+  const liabRow = now.rows.find(r => r.muted && r.neg);
+  const liab = liabRow ? Math.abs(num(liabRow.amt)) : 0;
+  now.total = "总资产 ≈" + Math.round(total).toLocaleString();
+  now.sub = "｜ 净资产 ≈" + Math.round(total - liab).toLocaleString() + (liab ? "（欠款 " + Math.round(liab).toLocaleString() + "）" : "");
+  assets.forEach((r, i) => {
+    const pct = total ? vals[i] / total * 100 : 0;
+    r.pc = pct.toFixed(1) + "%";
+  });
+  now.stack = assets.map((r, i) => {
+    const pct = total ? vals[i] / total * 100 : 0;
+    const short = String(r.name).split("（")[0];
+    return { w: +pct.toFixed(1), color: r.c, label: pct >= 8 ? short + " " + pct.toFixed(1) + "%" : "" };
+  });
+  const delta = balance - oldBank;
+  h.items.forEach(it => {
+    if (it.label === "当期余额") it.b = fmtB(balance);
+    else if (/总资产|流动资产/.test(it.label || "")) {
+      const approx = String(it.b).startsWith("≈");
+      it.b = (approx ? "≈" : "") + Math.round(num(it.b) + delta).toLocaleString();
+    }
+  });
+  (DATA.overview.tableRows || []).forEach(r => {
+    if (/银行|活期|现金/.test(r.tag || "")) r.now = fmtB(balance);
+    if (r.tag === "总资产") r.now = "≈" + Math.round(total).toLocaleString();
+    if (r.tag === "净资产") r.now = "≈" + Math.round(total - liab).toLocaleString();
+  });
+  return { total, delta };
+}
 function applyImport(txns, rules, save){
   const ag = aggregate(txns, rules);
   const blocks = buildImportBlocks(ag, rules);
@@ -1085,13 +1128,18 @@ function applyImport(txns, rules, save){
   setB("sec-2-1", blocks.b21, "2.1 流水概况");
   setB("sec-2-2", blocks.b22, "2.2 收入结构");
   setB("sec-2-3", blocks.b23, "2.3 大额支出（Top 20）");
+  /* 同步当期余额（流水按时间排序后的最后一笔余额）到 Hero 与分布卡 */
+  let balInfo = null;
+  const sorted = [...txns].sort((a, b) => ((a.d + (a.t || "")) > (b.d + (b.t || "")) ? 1 : -1));
+  const last = sorted[sorted.length - 1];
+  if (last && isFinite(last.bal) && last.bal >= 0) balInfo = applyBalance(last.bal);
   boot();
   /* 强反馈：展开刚写入的三节并定位到 2.1，否则折叠状态下看不出变化 */
   ["sec-2-1", "sec-2-2", "sec-2-3"].forEach(id => { const x = document.getElementById(id); if (x) x.open = true; });
   const target = document.getElementById("sec-2-1");
   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
   if (save !== false) { try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
-  return ag;
+  return { ag, balInfo, lastBal: last ? last.bal : null };
 }
 function loadStoredImport(){
   try {
@@ -1326,8 +1374,9 @@ function buildImporter(){
       alert("请先完成两步：\n1. 选择/粘贴流水后点「🔍 解析并预览」\n2. 预览确认无误后再点「✅ 应用到报告」");
       return;
     }
-    const ag = applyImport(lastTxns, lastRules, true);
-    alert("✅ 已应用到报告：共 " + lastTxns.length.toLocaleString() + " 笔（" + ag.dMin + " ~ " + ag.dMax + "）\n\n已写入并展开：2.1 流水概况 ｜ 2.2 收入结构 ｜ 2.3 大额支出\n页面已定位到 2.1，Hero 的「统计维度」也同步更新。");
+    const res = applyImport(lastTxns, lastRules, true);
+    const balMsg = (res.lastBal != null && res.balInfo) ? "\n已同步当期余额：" + res.lastBal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "（Hero 与分布卡已更新）" : "";
+    alert("✅ 已应用到报告：共 " + lastTxns.length.toLocaleString() + " 笔（" + res.ag.dMin + " ~ " + res.ag.dMax + "）" + balMsg + "\n\n已写入并展开：2.1 流水概况 ｜ 2.2 收入结构 ｜ 2.3 大额支出\n页面已定位到 2.1，Hero 的「统计维度」也同步更新。");
   });
   q("#impClear").addEventListener("click", () => {
     sessionStorage.removeItem(LS_KEY);
