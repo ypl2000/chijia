@@ -451,13 +451,14 @@ const DATA = {
 
   /* ---- 使用说明 ---- */
   guide: {
-    title: "📖 使用说明（通用模板，当前展示的是示例数据）",
+    title: "📖 使用说明与数据规则（通用模板，当前展示的是示例数据）",
     steps: [
-      "本页全部内容由 <b>DATA 对象</b> 渲染。两种填法：① 在第二部分「数据与流水导入」面板导入 JSON 数据包——数据仅存当前标签页会话，关闭浏览器自动清空，长期保留用「导出备份 JSON」（推荐）；② 直接编辑本文件顶部 DATA。逐字段说明见仓库 docs/DATA.md。",
-      "第二部分支持<b>流水导入</b>：可直接选择银行流水 PDF（首次需联网加载解析组件，解析在本地完成）或粘贴文本，自动生成流水概况、收入结构、大额支出三节；导入结果存于浏览器本地，可一键清除。",
+      "<b>数据从属规则：</b><b>数据包 JSON 是账本（主数据源）</b>——资产、资金计划、健康度评估的完整快照，页面上的「导出备份 JSON」就是它；<b>流水 PDF 是凭证（补充输入）</b>——每次导入只更新第二部分的流水统计与当期余额，不碰其他资产；备份 JSON = 账本 + 最新凭证的合订本，恢复它即回到完整状态。",
+      "<b>月度工作流：</b>② 导入流水 PDF 并应用 → ① 导出备份 JSON 固化最新状态 → 关闭浏览器（会话数据自动清空，磁盘上只留你的备份文件）。",
+      "填数据两种方式：① 在下方「数据与流水导入」面板导入 JSON 数据包（推荐，不改模板文件）；② 直接编辑本文件顶部 DATA。逐字段说明见仓库 docs/DATA.md。",
+      "<b>流水解析：</b>支持直接选择银行流水 PDF（首次需联网加载解析组件，解析在本地完成）或粘贴文本，自动生成流水概况、收入结构、大额支出三节；仅存当前标签页会话，可一键清除。当前内置交通银行·个人客户交易清单格式，其他银行见 docs/IMPORT.md。",
       "示例中的数字彼此自洽（分布条、占比、合计都对得上），替换时建议保持口径一致：数值统一千分位纯数字；固定资产按残值估值；虚拟股按购入成本计。",
-      "填完后点 Hero 上的按钮，可把「月支出/房租」口径带入 <b>财富自由计算器.html</b>（需放在同一文件夹）。",
-      "隐私提醒：本文件包含全部财务明细，注意保管；分享前先确认已清掉真实数据。"
+      "填完后点 Hero 上的按钮，可把「月支出/房租」口径带入 <b>财富自由计算器</b>（需放在同一文件夹）。隐私提醒：填了真实数据的 JSON 与 HTML 都是隐私文件，切勿上传公共仓库或外发。"
     ]
   },
 
@@ -775,7 +776,7 @@ function renderGuide(){
   const g = DATA.guide, box = $("guideBox");
   box.innerHTML = "";
   if (!g) return;
-  const d = el("details", "sec"); d.id = "sec-guide";
+  const d = el("details", "sec"); d.id = "sec-guide"; d.open = true;
   d.appendChild(el("summary", "", g.title + '<span class="chev">▼</span>'));
   const body = el("div", "sec-body");
   const ol = el("ol");
@@ -1199,13 +1200,14 @@ async function extractPdfText(buf){
 
 /* ---- 导入面板 ---- */
 function buildImporter(){
-  const d = el("details", "sec"); d.id = "sec-import";
+  const d = el("details", "sec"); d.id = "sec-import"; d.open = true;
   d.appendChild(el("summary", "", "📥 数据与流水导入 / 备份（本地处理，不上传）<span class=\"chev\">▼</span>"));
   const body = el("div", "sec-body");
   const imp = DATA.meta.importer;
+  body.appendChild(el("p", "sec-sub", '<b>数据规则：</b>① 数据包 JSON 是<b>账本（主数据源）</b>；② 流水 PDF 是<b>凭证（补充输入）</b>，只更新流水统计与当期余额。月度节奏：先 ② 后 ①，导出备份固化，关闭浏览器自动清空。'));
 
   /* ① 数据包 JSON：导入 / 导出 / 重置（会话级保存，关闭标签页即清空） */
-  body.appendChild(el("h4", "", '① 数据包 JSON <span class="hint">—— 报告全部数据 + 已导入的流水；仅存当前标签页会话，关闭浏览器自动清空、回到示例数据</span>'));
+  body.appendChild(el("h4", "", '① 数据包 JSON <span class="hint">—— 账本 · 主数据源：报告全部数据 + 已导入的流水；仅存当前标签页会话，关闭浏览器自动清空、回到示例数据</span>'));
   const dataRow = el("div", "");
   dataRow.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;";
   const mkBtn2 = (label) => { const b = el("button", "ffc-btn", label); b.style.cssText = "background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;"; return b; };
@@ -1219,7 +1221,7 @@ function buildImporter(){
   body.appendChild(dataRow);
 
   /* ② 银行流水解析 */
-  body.appendChild(el("h4", "", '② 银行流水解析 <span class="hint">—— 生成 2.1 / 2.2 / 2.3</span>'));
+  body.appendChild(el("h4", "", '② 银行流水解析 <span class="hint">—— 凭证 · 补充输入：只生成 2.1 / 2.2 / 2.3 并同步当期余额</span>'));
   body.appendChild(el("p", "sec-sub", '支持<b>直接选择 PDF</b>（可多选；首次使用需联网加载解析组件，解析本身仍在本地完成）或 .txt / .csv，也可把 PDF 里的文本全选复制粘贴到下面；点「解析并预览」后「应用到报告」。解析按"行号 + 日期 + 时间 + 类型 + C/D + 金额 + 余额 + 账号 + 户名摘要"的流水清单格式逐行识别。'));
   const grid = el("div", "");
   grid.style.cssText = "display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px;";
