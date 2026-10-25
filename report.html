@@ -434,6 +434,14 @@ const DATA = {
     }
   },
 
+  /* ---- 收入口径（近 12 个月 · 含奖金摊平）——发送计算器与「还要多少年」共用 ---- */
+  income: {
+    window: "2024-10 ~ 2025-09（示例）",
+    salary: 180000, bonus: 60000, subsidy: 12000,
+    total: 252000, monthlyAvg: 21000,
+    planMonthly: 18000, monthlyExpense: 6000
+  },
+
   /* ---- Hero：时期左右分栏指标 ---- */
   hero: {
     now: { head: "现在 · 【填当期年月】", items: [
@@ -730,6 +738,7 @@ const DATA = {
    渲染器 —— 只认 DATA，不含具体数字。
    ===================================================================== */
 const $ = (id) => document.getElementById(id);
+let INC = null;   /* 当前生效的收入口径状态（供 Hero 发送按钮使用） */
 function el(tag, cls, html){ const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
 const fmt = n => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -774,7 +783,7 @@ function renderHero(){
         else if (/公积金|限用途/.test(n)) p.restricted = (p.restricted || 0) + v;
         else if (/固定资产|车/.test(n)) p.consumer = (p.consumer || 0) + v;
       });
-      try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields, portfolio: p })); } catch(e){}
+      try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields, portfolio: p, income: window.__INCOME || null })); } catch(e){}
       window.open(m.calculator.file, "_blank");
     });
     wrap.appendChild(btn);
@@ -1154,6 +1163,25 @@ function applyImport(txns, rules, save){
   if (save !== false) { try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
   return { ag, balInfo, lastBal: last ? last.bal : null };
 }
+/* 近 12 个月收入（含奖金）：按分类汇总最近一年的 C 类入账，月均 = 总额 / min(12, 实际跨度) */
+function computeIncome12m(txns, rules, src){
+  if (!txns || !txns.length) return null;
+  const cats = txns.filter(t => t.dc === "C")
+    .map(t => ({ d: t.d, amt: t.amt, cat: classifyTxn(t, rules) }))
+    .filter(x => x.cat === "salary" || x.cat === "bonus" || x.cat === "sub");
+  if (!cats.length) return null;
+  const dMax = cats.reduce((m, x) => x.d > m ? x.d : m, "");
+  const cutoff = (parseInt(dMax.slice(0, 4), 10) - 1) + dMax.slice(4);
+  const win = cats.filter(x => x.d > cutoff);
+  if (!win.length) return null;
+  const sum = c => win.filter(x => x.cat === c).reduce((a, x) => a + x.amt, 0);
+  const salary = sum("salary"), bonus = sum("bonus"), subsidy = sum("sub");
+  const allDates = txns.reduce((acc, t) => { acc.push(t.d); return acc; }, []);
+  const dMin = allDates.reduce((m, x) => x < m ? x : m, "9999");
+  const spanM = Math.max(1, Math.min(12, (parseInt(dMax.slice(0, 4), 10) - parseInt(dMin.slice(0, 4), 10)) * 12 + (parseInt(dMax.slice(5, 7), 10) - parseInt(dMin.slice(5, 7), 10)) + 1));
+  const total = salary + bonus + subsidy;
+  return { window: cutoff + " ~ " + dMax, salary, bonus, subsidy, total, monthlyAvg: total / spanM, span: spanM, src: src || "流水" };
+}
 function loadStoredImport(){
   try {
     const raw = sessionStorage.getItem(LS_KEY);
@@ -1271,6 +1299,22 @@ function buildImporter(){
   body.appendChild(btns);
   const prev = el("div", "", ""); prev.id = "impPreview";
   body.appendChild(prev);
+
+  /* ③ 收入口径（近 12 个月 · 含奖金）与可调月支出 */
+  body.appendChild(el("h4", "", '③ 收入口径（近 12 个月 · 含奖金）与月支出 <span class="hint">—— 发送计算器 / 组合体检 / 「还要多少年」共用这两个口径</span>'));
+  const incRow = el("div", "");
+  incRow.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;";
+  incRow.appendChild(el("label", "", "每月支出")).style.cssText = "font-size:12.5px;color:var(--sub);flex:none;";
+  const spendAdj = el("input", "", ""); spendAdj.id = "spendAdj"; spendAdj.type = "number"; spendAdj.min = 0; spendAdj.step = 100;
+  spendAdj.style.cssText = "width:110px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:13.5px;text-align:right;background:#fff;";
+  incRow.appendChild(spendAdj);
+  incRow.appendChild(el("span", "unit", "元/月（调整后同步计算器与组合体检）"));
+  body.appendChild(incRow);
+  const incC1 = el("div", "", ""); incC1.id = "incC1"; incC1.style.cssText = "font-size:13.5px;margin:4px 0;";
+  const incC2 = el("div", "", ""); incC2.id = "incC2"; incC2.style.cssText = "font-size:13.5px;margin:4px 0;";
+  const incSrc = el("div", "", ""); incSrc.id = "incSrc"; incSrc.style.cssText = "font-size:12px;color:var(--sub);margin-top:2px;";
+  body.appendChild(incC1); body.appendChild(incC2); body.appendChild(incSrc);
+
   d.appendChild(body);  /* 先入树，再绑事件（下方局部查询依赖 d 已包含 body） */
   /* 交互（注意：此时 d 尚未入文档，须用局部查询而非 getElementById） */
   let lastTxns = null, lastRules = null;
@@ -1322,9 +1366,44 @@ function buildImporter(){
     if (!confirm("重置为示例数据？当前载入的数据包与已导入的流水将被清除（不影响你导出的备份文件）。")) return;
     sessionStorage.removeItem(DATA_KEY);
     sessionStorage.removeItem(LS_KEY);
+    sessionStorage.removeItem("FRI_SPEND");
     location.reload();
   });
   refreshDataStatus();
+
+  /* ③ 收入口径：优先用本会话流水实时计算，其次数据包，最后计划默认 */
+  const incomeFromTxns = () => {
+    const st = loadStoredImport();
+    if (!st || !st.txns || !st.txns.length) return null;
+    return computeIncome12m(st.txns, Object.assign({}, DATA.meta.importer, st.rules), "本会话流水实时计算");
+  };
+  const getSpend = () => { const v = parseFloat(q("#spendAdj").value); return isFinite(v) && v >= 0 ? v : 0; };
+  const refreshIncome = () => {
+    INC = incomeFromTxns() || (DATA.income ? Object.assign({ src: "数据包" }, DATA.income) : null);
+    const sp = getSpend();
+    DATA.meta.calculator.fields.spend = sp;
+    if (DATA.income) DATA.income.monthlyExpense = sp;
+    try { sessionStorage.setItem("FRI_SPEND", JSON.stringify(sp)); } catch(e){}
+    if (INC) {
+      q("#incC1").innerHTML = "口径一 · 月均收入（含奖金摊平）：<b>" + fmt(INC.monthlyAvg) + "</b> 元/月" + (INC.window ? "　<span class=\"hint\">" + INC.window + "</span>" : "");
+      q("#incC2").innerHTML = "口径二 · 月结余：<b>" + fmt(INC.monthlyAvg - sp) + "</b> 元/月 = 收入 − 每月支出";
+      q("#incSrc").textContent = "来源：" + (INC.src || "数据包") + (INC.salary !== undefined ? " ｜ 工资 " + fmt(INC.salary) + " + 年终奖 " + fmt(INC.bonus) + " + 补贴 " + fmt(INC.subsidy) + " = " + fmt(INC.total) + " / 12 个月" : "");
+    } else {
+      q("#incC1").textContent = "口径一 · 月均收入：—（导入流水或数据包后自动计算）";
+      q("#incC2").textContent = "口径二 · 月结余：—";
+      q("#incSrc").textContent = "";
+    }
+    window.__INCOME = INC ? { avg12m: +INC.monthlyAvg.toFixed(2), surplus: +(INC.monthlyAvg - sp).toFixed(2) } : null;
+  };
+  q("#spendAdj").addEventListener("input", refreshIncome);
+  /* 支出默认值：会话内调整过 → 用调整值；否则用数据包/计划默认 */
+  (function initSpend(){
+    let sp = null;
+    try { const raw = sessionStorage.getItem("FRI_SPEND"); if (raw !== null) sp = JSON.parse(raw); } catch(e){}
+    if (sp === null || !isFinite(sp) || sp < 0) sp = (DATA.income && isFinite(DATA.income.monthlyExpense)) ? DATA.income.monthlyExpense : m.calculator.fields.spend;
+    q("#spendAdj").value = sp;
+  })();
+  refreshIncome();
 
   const readRules = () => ({
     employer: q("#impEmployer").value.trim() || imp.employer,
