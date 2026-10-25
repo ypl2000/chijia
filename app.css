@@ -369,7 +369,7 @@
   /* ===== 深色模式（跟随系统）===== */
   @media (prefers-color-scheme: dark){
     :root{
-      --ink:#e8ecf5; --sub:#9aa3b5; --line:#2a3242; --bg:#11151d; --card:#1a2130;
+      --ink:#e8ecf5; --sub:#a9b4c9; --line:#2f3949; --bg:#11151d; --card:#1a2130;
       --blue-soft:#1c2b45; --green-soft:#12301f; --orange-soft:#33270f;
       --gray-soft:#20242c; --red-soft:#331a19;
     }
@@ -381,7 +381,7 @@
     input[type=number],input[type=text]{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important;}
     .btn,.ffc-btn{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important;}
     .qbar{background:#252d3d;}
-    .callout{filter:brightness(.9);}
+
     .stat-side{background:rgba(255,255,255,.06);}
     footer{color:var(--sub);}
   }
@@ -402,3 +402,35 @@
   .c12i span{color:var(--sub);}
   .c12e{font-size:12.5px;border-top:1px dashed var(--line);padding-top:6px;}
   @media (min-width:641px){ .cards12{display:none!important;} }
+
+/* ===== 手机端（≤640px）：可读性 + 左右紧凑布局 ===== */
+@media (max-width:640px){
+  body{font-size:14.5px;}
+  .sec-sub,.callout{font-size:13.5px;line-height:1.7;}
+  .hint{font-size:12.5px;}
+  .tbl-wrap table{font-size:13px;}
+  .card12{font-size:12.5px;}
+  /* Hero：现在 ➜ 计划期末 左右紧凑 */
+  .stat-split{grid-template-columns:1fr 16px 1fr;gap:0;margin-top:10px;}
+  .stat-arrow{font-size:13px;}
+  .stat-side{padding:8px 9px;border-radius:10px;}
+  .stat-side .ss-head{font-size:10.5px;margin-bottom:5px;}
+  .stat-side .ss-items{gap:4px 10px;}
+  .stat-side .ss-item{min-width:0;}
+  .stat-side .ss-item span{font-size:10px;}
+  .stat-side .ss-item b{font-size:12.5px;}
+  /* 资金分布：现在 ｜ 预期 左右 */
+  .dist-grid{grid-template-columns:1fr 14px 1fr;gap:5px;align-items:start;}
+  .dist-arrow,.dist-arrow .big{font-size:14px;}
+  .dist-card{padding:9px 9px;}
+  .dist-card .dc-head{font-size:10.5px;}
+  .dist-card .dc-total{font-size:13.5px;margin:2px 0 8px;}
+  .dist-card .dc-total span{display:block;font-size:10.5px!important;font-weight:400;margin-top:2px;}
+  .dstack{height:16px;font-size:0;margin:5px 0 8px;}
+  .drow{gap:4px;font-size:10.5px;margin:5px 0;}
+  .drow .nm{flex:1;min-width:0;}
+  .drow .amt{font-size:10.5px;}
+  .drow .pc2{font-size:10px;width:auto;flex:none;}
+  /* 折叠提示 */
+  details.sec > summary,details.sub > summary{font-size:13.5px;}
+}
