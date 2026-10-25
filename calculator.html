@@ -164,6 +164,12 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
   details.basket summary,details.glos summary{padding:13px 14px;font-size:13.5px}
   details.glos .gbody{padding:0 14px 14px}
 }
+  .yrow{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px dashed rgba(255,255,255,.12);}
+  .yrow:last-of-type{border-bottom:none;}
+  .yrow .yn{flex:0 0 210px;font-size:13px;color:var(--tx2,#9aa3b5);}
+  .yrow .yv{font-size:22px;font-weight:800;flex:none;min-width:110px;}
+  .yrow .yd{font-size:12px;color:var(--tx2,#9aa3b5);flex:1;}
+  .ynote{margin-top:12px;font-size:12px;color:var(--tx2,#9aa3b5);}
 </style>
 </head>
 <body>
@@ -227,6 +233,18 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
   </div>
 </section>
 
+<!-- ================= 还要多少年 ================= -->
+<section>
+  <h2>⏳ 还要多少年（按现在的收入与收益）</h2>
+  <p class="secdesc">真实购买力口径：收益、投入、目标都按今天的钱计（收益 = r 对个人账单通胀）。在「我的参数」里调 <b>月收入</b> 与 <b>当前可生息本金</b>，这里逐年模拟到你追上各档目标为止。前提：收入随通胀增长。</p>
+  <div class="card">
+    <div class="yrow"><div class="yn" id="yn1">—</div><div class="ybar"><div class="tbar"><i id="ybar1"></i></div></div><div class="yv" id="yv1">—</div><div class="yd" id="yd1">—</div></div>
+    <div class="yrow"><div class="yn" id="yn2">—</div><div class="ybar"><div class="tbar"><i id="ybar2"></i></div></div><div class="yv" id="yv2">—</div><div class="yd" id="yd2">—</div></div>
+    <div class="yrow"><div class="yn" id="yn3">—</div><div class="ybar"><div class="tbar"><i id="ybar3"></i></div></div><div class="yv" id="yv3">—</div><div class="yd" id="yd3">—</div></div>
+    <div class="ynote" id="ynote">—</div>
+  </div>
+</section>
+
 <!-- ================= 输入 ================= -->
 <section>
   <h2>我的参数</h2>
@@ -237,6 +255,10 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
       <div class="igtitle">生活支出</div>
       <div class="igrid">
         <div class="field">
+          <div class="fhead"><label>月收入（税后到手，含奖金摊平）</label><input type="number" id="incomeN" value="25000" min="0" step="500"><span class="unit">元/月</span></div>
+          <input type="range" id="income" min="0" max="100000" step="500" value="25000">
+          <div class="fhead"><label>当前可生息本金（权益+稳健+现金+公司股权）</label><input type="number" id="p0N" value="0" min="0" step="10000"><span class="unit">元</span></div>
+          <input type="range" id="p0" min="0" max="3000000" step="10000" value="0">
           <div class="fhead"><label>月支出</label><input type="number" id="spendN" value="10000" min="1000" step="500"><span class="unit">元/月</span></div>
           <input type="range" id="spend" min="3000" max="50000" step="500" value="10000">
           <div class="fhint">财富自由后希望维持的生活水平</div>
@@ -433,7 +455,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
 
 <script>
 const $ = id => document.getElementById(id);
-const DEFAULTS = {spend:10000, rent:4000, foodPct:25, medPct:10, r:4, cpi:2, swr:3.5, kids:0, childCost:108, health:60, invest:0, investYears:0};
+const DEFAULTS = {spend:10000, rent:4000, income:25000, p0:0, foodPct:25, medPct:10, r:4, cpi:2, swr:3.5, kids:0, childCost:108, health:60, invest:0, investYears:0};
 const FIELDS = Object.keys(DEFAULTS);
 
 function fmtInt(n){ return Math.round(n).toLocaleString('zh-CN'); }
@@ -577,6 +599,45 @@ function recalc(){
     $(`t${i+1}bar`).style.width = (isFinite(t.total) ? t.total/maxTotal*100 : 0) + '%';
   });
 
+  /* ---- ⏳ 还要多少年：真实口径逐年模拟（内部单位：万） ---- */
+  const Cw = Math.max(0, p.income - p.spend) * 12 / 10000;   // 万/年
+  const P0w = p.p0 / 10000;                                   // 万
+  const yearNow = new Date().getFullYear();
+  tiers.forEach((t, i) => {
+    const yv = $("yv" + (i + 1)), yd = $("yd" + (i + 1)), yb = $("ybar" + (i + 1)), yn = $("yn" + (i + 1));
+    if (!yv) return;
+    yn.textContent = (t.name || ("档位 " + (i + 1))) + " · 目标 " + wan(t.total);
+    const T = t.total;
+    if (!isFinite(T)) { yv.textContent = "—"; yd.textContent = ""; yb.style.width = "0%"; return; }
+    if (P0w >= T) {
+      yv.innerHTML = '<span style="color:var(--green)">已达成 🎉</span>';
+      yd.textContent = "现有 " + wan(P0w) + " ≥ 目标 " + wan(T) + "，富余 " + wan(P0w - T);
+      yb.style.width = "100%";
+      return;
+    }
+    if (Cw <= 0) {
+      yv.innerHTML = '<span style="color:var(--red);font-weight:800">无法积累</span>';
+      yd.textContent = "月收入 ≤ 月支出——先降支出或增收入，否则本金只减不增。";
+      yb.style.width = Math.min(100, P0w / T * 100) + "%";
+      return;
+    }
+    let P = P0w, n = 0;
+    for (n = 1; n <= 99; n++){ P = P * (1 + rReal) + Cw; if (P >= T) break; }
+    if (n > 99) {
+      yv.innerHTML = '<span style="color:var(--red);font-weight:800">99 年+</span>';
+      yd.textContent = "按年投 " + wan(Cw) + " 追不上（真实收益 " + (rReal * 100).toFixed(2) + "% 太低）——提高收益或投入。";
+      yb.style.width = Math.min(100, P / T * 100) + "%";
+      return;
+    }
+    yv.textContent = "约 " + n + " 年";
+    yd.textContent = "预计 " + (yearNow + n) + " 年达成 ｜ 现有 " + wan(P0w) + " · 年投 " + wan(Cw) + " · 真实收益 " + (rReal * 100).toFixed(2) + "%";
+    yb.style.width = Math.min(100, Math.max(2, P0w / T * 100)) + "%";
+  });
+  const doneCount = tiers.filter(t => P0w >= t.total).length;
+  $("ynote").textContent = Cw <= 0
+    ? "当前收入覆盖不了支出：财富自由的前提是先有结余。"
+    : "口径：目标与收益均已折算为今天的购买力（真实收益 " + (rReal * 100).toFixed(2) + "% = 名义 " + p.r + "% 对个人账单通胀 " + pi.toFixed(2) + "%）；每年投入 " + wan(Cw) + "；未计市场波动序列与一次性收支。已达标档位 " + doneCount + "/3。";
+
   drawChart(ySpend, rReal);
   LAST = p;
 }
@@ -635,6 +696,14 @@ recalc();
     if (DEFAULTS[k] === undefined || !isFinite(v)) return;
     $(k).value = v; $(k + 'N').value = v; applied.push(k);
   });
+  if (pre.income && isFinite(pre.income.avg12m) && DEFAULTS.income !== undefined) {
+    $("income").value = pre.income.avg12m; $("incomeN").value = pre.income.avg12m;
+    applied.push("月收入(近12月均)");
+  }
+  if (pre.portfolio) {
+    const v = ["equity", "bond", "cash", "esop"].reduce((a, k) => a + (isFinite(pre.portfolio[k]) ? pre.portfolio[k] : 0), 0);
+    if (v > 0 && DEFAULTS.p0 !== undefined) { $("p0").value = v; $("p0N").value = v; applied.push("可生息本金"); }
+  }
   if (!applied.length) return;
   recalc();
   const bar = document.createElement('div');
