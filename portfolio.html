@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>组合体检 · Portfolio Check — 持家 chijia</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --ink:#1c2333; --sub:#6b7486; --line:#e3e8f2;
+    --blue:#2f6fed; --blue-soft:#eaf1ff; --green:#1a9e6c; --green-soft:#e6f6ef;
+    --orange:#e8862e; --orange-soft:#fdf0df; --red:#d64545; --red-soft:#fdeaea;
+    --gray:#8a93a8; --violet:#8b5cf6; --teal:#14b8a6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    line-height:1.6;
+  }
+  header{
+    background:linear-gradient(135deg,#22315c 0%,#2f6fed 100%);
+    color:#fff;padding:30px 22px 26px;text-align:center;
+  }
+  header h1{margin:0;font-size:24px;letter-spacing:.5px;}
+  header p{margin:8px 0 0;opacity:.85;font-size:13.5px;}
+  header .lock{display:inline-block;margin-top:10px;font-size:12px;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:4px 14px;}
+  main{max-width:980px;margin:0 auto;padding:22px 16px 60px;}
+  .card{
+    background:var(--card);border-radius:14px;box-shadow:0 1px 3px rgba(28,35,51,.07);
+    padding:20px 22px;margin-bottom:16px;
+  }
+  .card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .card h2::before{content:"";width:5px;height:17px;border-radius:3px;background:var(--blue);display:inline-block;}
+  .hint{font-weight:400;color:var(--sub);font-size:12.5px;}
+  .desc{color:var(--sub);font-size:13px;margin:6px 0 14px;}
+  .buckets{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;}
+  .bucket{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fbfcfe;}
+  .bucket.off{background:#f6f7fa;}
+  .bucket .bname{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;}
+  .bucket .bsub{font-size:12px;color:var(--sub);margin:2px 0 8px;}
+  .bucket .brow{display:flex;gap:10px;align-items:center;}
+  .bucket label{font-size:12px;color:var(--sub);flex:none;}
+  input[type=number]{
+    width:110px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;
+    font-size:13.5px;background:#fff;color:var(--ink);text-align:right;
+  }
+  input[type=number]:focus{outline:none;border-color:var(--blue);}
+  .unit{font-size:12px;color:var(--sub);}
+  .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:4px;}
+  .param label{display:block;font-size:12.5px;color:var(--sub);margin-bottom:4px;}
+  .param input[type=range]{width:100%;accent-color:var(--blue);cursor:pointer;}
+  .param .pv{font-size:16px;font-weight:800;}
+  .lights{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0 4px;}
+  .light{border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .light .lname{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
+  .bulb{width:12px;height:12px;border-radius:50%;flex:none;}
+  .g{background:var(--green);box-shadow:0 0 8px rgba(26,158,108,.5);}
+  .y{background:var(--orange);box-shadow:0 0 8px rgba(232,134,46,.5);}
+  .r{background:var(--red);box-shadow:0 0 8px rgba(214,69,69,.5);}
+  .light .lverdict{font-size:14px;font-weight:800;margin:4px 0 2px;}
+  .light .ldetail{font-size:12.5px;color:var(--sub);}
+  .rbar{margin:14px 0 4px;}
+  .rbar .bar{position:relative;height:18px;background:#eef2f8;border-radius:99px;overflow:visible;}
+  .rbar .fill{position:absolute;left:0;top:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#5b8bf0,var(--blue));}
+  .rbar .mark{position:absolute;top:-7px;width:2px;height:32px;background:var(--red);}
+  .rbar .mark::after{content:"模型假设";position:absolute;top:-18px;left:-24px;font-size:11px;color:var(--red);white-space:nowrap;}
+  .rbar .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);margin-top:6px;}
+  .big{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .verdict-line{margin:10px 0 0;font-size:15px;font-weight:700;}
+  ol.sugg{margin:8px 0 0;padding-left:22px;}
+  ol.sugg li{margin-bottom:10px;font-size:13.5px;}
+  .callout{border-left:4px solid var(--blue);background:#f2f7ff;border-radius:0 10px 10px 0;padding:10px 14px;font-size:13px;margin:12px 0;}
+  .callout.warn{border-color:var(--orange);background:var(--orange-soft);}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;}
+  .btn{
+    border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;
+    padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .btn:hover{filter:brightness(.97);}
+  .status{font-size:12.5px;color:var(--sub);}
+  footer{text-align:center;color:var(--sub);font-size:12px;padding:10px 16px 40px;}
+  @media (max-width:640px){ .big{font-size:28px;} header{padding:24px 14px;} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧪 组合体检 · Portfolio Check</h1>
+  <p>持家 chijia 三件套之一 ｜ 你手里的持仓，配得上「长期 4%」这个假设吗？</p>
+  <span class="lock">🔒 全部计算在浏览器本地完成，不上传任何数据</span>
+</header>
+
+<main>
+
+  <!-- ① 持仓 -->
+  <section class="card">
+    <h2>① 我的持仓</h2>
+    <p class="desc">按资产类别填金额（不持有的填 0）。每个桶的长期年化可改——默认值是全球宽基类资产的百年历史量级，<b>名义值、非保证</b>。</p>
+    <div class="buckets">
+      <div class="bucket">
+        <div class="bname"><span class="dot" style="background:var(--blue)"></span>权益类</div>
+        <div class="bsub">宽基指数 / 红利 / 股票基金——承担跑赢通胀任务的钱</div>
+        <div class="brow"><label>金额</label><input type="number" id="equity" value="0" min="0" step="1000"><label>年化</label><input type="number" id="equityR" value="8" min="0" max="20" step="0.5"><span class="unit">%</span></div>
+      </div>
+      <div class="bucket">
+        <div class="bname"><span class="dot" style="background:var(--teal)"></span>稳健类</div>
+        <div class="bsub">债券基金 / 固收+ / 定期存款</div>
+        <div class="brow"><label>金额</label><input type="number" id="bond" value="0" min="0" step="1000"><label>年化</label><input type="number" id="bondR" value="3.5" min="0" max="15" step="0.5"><span class="unit">%</span></div>
+      </div>
+      <div class="bucket">
+        <div class="bname"><span class="dot" style="background:var(--gray)"></span>现金类</div>
+        <div class="bsub">货币基金 / 活期理财 / 活期存款</div>
+        <div class="brow"><label>金额</label><input type="number" id="cash" value="0" min="0" step="1000"><label>年化</label><input type="number" id="cashR" value="1.8" min="0" max="10" step="0.1"><span class="unit">%</span></div>
+      </div>
+      <div class="bucket">
+        <div class="bname"><span class="dot" style="background:var(--orange)"></span>公司股权（ESOP / 受限股）</div>
+        <div class="bsub">与工资同源——收益打折计入（×0.6），并单独检查集中度</div>
+        <div class="brow"><label>金额</label><input type="number" id="esop" value="0" min="0" step="1000"><label>年化</label><input type="number" id="esopR" value="6" min="0" max="20" step="0.5"><span class="unit">%</span></div>
+      </div>
+      <div class="bucket off">
+        <div class="bname"><span class="dot" style="background:var(--violet)"></span>消费资产（汽车等）</div>
+        <div class="bsub">逐年折旧——这是消费，不是生息资产，不计入组合</div>
+        <div class="brow"><label>金额</label><input type="number" id="consumer" value="0" min="0" step="1000"></div>
+      </div>
+      <div class="bucket off">
+        <div class="bname"><span class="dot" style="background:#14b8a6"></span>限用途（公积金等）</div>
+        <div class="bsub">只能用于住房等特定用途——不算可自由调仓的生息资产</div>
+        <div class="brow"><label>金额</label><input type="number" id="restricted" value="0" min="0" step="1000"></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="fromReport">⬆️ 从资金报告导入持仓</button>
+      <button class="btn" id="clearAll">🧹 清空</button>
+      <span class="status" id="srcStatus"></span>
+    </div>
+  </section>
+
+  <!-- ② 参数 -->
+  <section class="card">
+    <h2>② 体检参数</h2>
+    <div class="params">
+      <div class="param">
+        <label>距离可能用到这笔钱还有 <span class="pv" id="yearsV">10</span> 年</label>
+        <input type="range" id="years" min="0" max="30" step="1" value="10">
+      </div>
+      <div class="param">
+        <label>模型假设的长期年化收益（与财富自由计算器的 r 一致）</label>
+        <input type="number" id="modelR" value="4" min="0" max="15" step="0.1"> <span class="unit">% / 年</span>
+      </div>
+      <div class="param">
+        <label>当前月支出（用于流动性检查）</label>
+        <input type="number" id="monthlyExpense" value="6000" min="0" step="500"> <span class="unit">元/月</span>
+      </div>
+      <div class="param">
+        <label>每月可投入（用于估算补齐时间）</label>
+        <input type="number" id="monthlyInvest" value="6000" min="0" step="500"> <span class="unit">元/月</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 结果 -->
+  <section class="card">
+    <h2>③ 体检结果</h2>
+    <div class="rbar">
+      <div class="bar"><div class="fill" id="rFill"></div><div class="mark" id="rMark"></div></div>
+      <div class="cap"><span>0%</span><span>组合有效收益 vs 模型假设（坐标 0~10%）</span><span>10%</span></div>
+    </div>
+    <div>
+      <span class="big" id="rEffBig">—</span>
+      <span class="unit">有效年化 ｜ </span>
+      <span class="unit" id="rNominalLine">名义 — ｜ ESOP 打折系数 0.6</span>
+    </div>
+    <div class="verdict-line" id="verdictLine">—</div>
+    <div class="lights">
+      <div class="light"><div class="lname"><span class="bulb" id="l1b"></span>收益达标</div><div class="lverdict" id="l1v">—</div><div class="ldetail" id="l1d">—</div></div>
+      <div class="light"><div class="lname"><span class="bulb" id="l2b"></span>单一集中度</div><div class="lverdict" id="l2v">—</div><div class="ldetail" id="l2d">—</div></div>
+      <div class="light"><div class="lname"><span class="bulb" id="l3b"></span>权益配比</div><div class="lverdict" id="l3v">—</div><div class="ldetail" id="l3d">—</div></div>
+      <div class="light"><div class="lname"><span class="bulb" id="l4b"></span>流动性</div><div class="lverdict" id="l4v">—</div><div class="ldetail" id="l4d">—</div></div>
+    </div>
+    <div class="callout" id="exclLine">—</div>
+  </section>
+
+  <!-- ④ 建议 -->
+  <section class="card">
+    <h2>④ 调整建议 <span class="hint">—— 只到资产类别层面，不构成投资建议；最多四条，按紧迫度排序</span></h2>
+    <ol class="sugg" id="suggList"><li>填入持仓后自动生成。</li></ol>
+  </section>
+
+</main>
+
+<footer>
+  持家 chijia · 组合体检 ｜ 与 <a href="report.html">资金报告</a>、<a href="calculator.html">财富自由计算器</a> 组成三件套<br>
+  预期收益为长期历史量级的名义假设，不构成任何收益承诺或投资建议 ｜ 所有计算本地完成
+</footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+const fmt = (n, dec) => n.toLocaleString("en-US", { minimumFractionDigits: dec === undefined ? 0 : dec, maximumFractionDigits: dec === undefined ? 0 : dec });
+
+const BUCKETS = [
+  { key: "equity",     label: "权益类",   color: "var(--blue)" },
+  { key: "bond",       label: "稳健类",   color: "var(--teal)" },
+  { key: "cash",       label: "现金类",   color: "var(--gray)" },
+  { key: "esop",       label: "公司股权", color: "var(--orange)" },
+  { key: "consumer",   label: "消费资产", color: "var(--violet)" },
+  { key: "restricted", label: "限用途",   color: "#14b8a6" }
+];
+
+function readState(){
+  const v = {};
+  BUCKETS.forEach(b => v[b.key] = Math.max(0, num(b.key)));
+  v.equityR = num("equityR"); v.bondR = num("bondR"); v.cashR = num("cashR"); v.esopR = num("esopR");
+  v.years = num("years"); v.modelR = num("modelR");
+  v.monthlyExpense = Math.max(0, num("monthlyExpense")); v.monthlyInvest = Math.max(0, num("monthlyInvest"));
+  return v;
+}
+
+/* 核心计算 */
+function compute(s){
+  const income = s.equity + s.bond + s.cash + s.esop;           // 生息组合
+  const rNominal = income > 0
+    ? (s.equity * s.equityR + s.bond * s.bondR + s.cash * s.cashR + s.esop * s.esopR) / income / 100
+    : null;
+  const rEff = income > 0
+    ? (s.equity * s.equityR + s.bond * s.bondR + s.cash * s.cashR + s.esop * s.esopR * 0.6) / income / 100
+    : null;                                                       // ESOP 收益 ×0.6：与工资同源，打折计
+  const esopShare = income > 0 ? s.esop / income : 0;
+  const equityShare = income > 0 ? (s.equity + s.esop) / income : 0;
+  const liq = s.bond + s.cash;
+  const liqMonths = s.monthlyExpense > 0 ? liq / s.monthlyExpense : null;
+  /* 距提取年数 → 目标权益区间 */
+  let band;
+  if (s.years > 15) band = [70, 90];
+  else if (s.years > 10) band = [50, 70];
+  else if (s.years > 5) band = [30, 50];
+  else band = [20, 40];
+  return { income, rNominal, rEff, esopShare, equityShare, liq, liqMonths, band };
+}
+
+function setLight(idx, level, verdict, detail){
+  const b = $("l" + idx + "b"), v = $("l" + idx + "v"), dd = $("l" + idx + "d");
+  b.className = "bulb " + level;
+  v.textContent = verdict; dd.textContent = detail;
+  v.style.color = level === "g" ? "var(--green)" : level === "y" ? "var(--orange)" : level === "r" ? "var(--red)" : "var(--sub)";
+}
+
+function recalc(){
+  const s = readState();
+  const c = compute(s);
+  const pct = x => (x * 100).toFixed(1) + "%";
+
+  /* 收益对比条：0~10% 坐标 */
+  const scale = v => Math.max(0, Math.min(100, v / 10 * 100));
+  $("rFill").style.width = (c.rEff === null ? 0 : scale(c.rEff)) + "%";
+  $("rMark").style.left = scale(s.modelR) + "%";
+  $("rEffBig").textContent = c.rEff === null ? "—" : (c.rEff * 100).toFixed(2) + "%";
+  $("rNominalLine").textContent = "名义 " + (c.rNominal === null ? "—" : (c.rNominal * 100).toFixed(2) + "%") +
+    " ｜ ESOP 打折系数 0.6 ｜ 生息组合 " + fmt(c.income) + " 元";
+
+  /* 灯 1：收益达标 */
+  if (c.rEff === null) setLight(1, "r", "无生息资产", "四个生息桶都是 0——先让钱进入组合。");
+  else {
+    const mr = s.modelR / 100;
+    const diff = (c.rEff - mr) * 100;
+    if (diff >= 0) setLight(1, "g", "达标", "有效收益 " + pct(c.rEff) + " ≥ 模型假设 " + mr.toFixed(1) + "%，组合撑得起这个假设。");
+    else if (diff >= -1) setLight(1, "y", "勉强", "有效收益比模型假设低 " + Math.abs(diff).toFixed(2) + "pp——缺口不大，调仓或微调假设二选一。");
+    else setLight(1, "r", "不达标", "有效收益 " + pct(c.rEff) + " < 模型假设 " + mr.toFixed(1) + "%：按 " + mr.toFixed(1) + "% 测算的本金需求被低估了。");
+  }
+  /* 灯 2：集中度 */
+  if (s.esop === 0) setLight(2, "g", "无公司股权", "不持有与工资同源的公司股权——此项无风险。");
+  else if (c.esopShare <= 0.2) setLight(2, "g", "健康", "公司股权占生息组合 " + pct(c.esopShare) + "（上限 20%）。");
+  else if (c.esopShare <= 0.4) setLight(2, "y", "偏高", "公司股权占生息组合 " + pct(c.esopShare) + "（上限 20%）——收入与股权同源，回撤会同时打击两头。");
+  else setLight(2, "r", "过度集中", "公司股权占生息组合 " + pct(c.esopShare) + "（上限 20%）——相当于把身家和职业都押在同一雇主。");
+  /* 灯 3：权益配比 */
+  if (c.income === 0) setLight(3, "r", "无组合", "无生息资产，无配比可言。");
+  else {
+    const lo = c.band[0], hi = c.band[1], share = c.equityShare * 100;
+    if (share >= lo && share <= hi) setLight(3, "g", "在目标区间", "权益占比 " + pct(c.equityShare) + "，目标 " + lo + "~" + hi + "%（距提取 " + s.years + " 年）。");
+    else {
+      const off = share < lo ? (lo - share) : (share - hi);
+      const level = off <= 10 ? "y" : "r";
+      const dir = share < lo ? "低于" : "高于";
+      setLight(3, level, dir + "目标区间", "权益占比 " + pct(c.equityShare) + "，目标 " + lo + "~" + hi + "%（距提取 " + s.years + " 年），偏离 " + off.toFixed(0) + "pp。");
+    }
+  }
+  /* 灯 4：流动性 */
+  if (s.monthlyExpense === 0) setLight(4, "y", "未评估", "填写月支出后检查（现金+稳健 应 ≥ 6 个月支出）。");
+  else if (c.liqMonths >= 6) setLight(4, "g", "充足", "现金+稳健 = " + fmt(c.liq) + "，约 " + c.liqMonths.toFixed(1) + " 个月支出（≥6）。");
+  else if (c.liqMonths >= 3) setLight(4, "y", "偏薄", "现金+稳健约 " + c.liqMonths.toFixed(1) + " 个月支出（建议 ≥6）。");
+  else setLight(4, "r", "不足", "现金+稳健仅 " + c.liqMonths.toFixed(1) + " 个月支出（建议 ≥6）——一次失业/急用就要被迫卖权益。");
+
+  /* 结论行 */
+  const levels = [document.getElementById("l1b").className.slice(-1), document.getElementById("l2b").className.slice(-1),
+                  document.getElementById("l3b").className.slice(-1), document.getElementById("l4b").className.slice(-1)];
+  const reds = levels.filter(x => x === "r").length, yellows = levels.filter(x => x === "y").length;
+  let verdict, color;
+  if (reds === 0 && yellows === 0) { verdict = "✅ 组合合格：四个维度全部达标，撑得起模型假设。"; color = "var(--green)"; }
+  else if (reds === 0) { verdict = "🟡 大体合格，" + yellows + " 处值得优化（见下方建议）。"; color = "var(--orange)"; }
+  else { verdict = "🔴 组合不合格：" + reds + " 项红灯" + (yellows ? "、" + yellows + " 项黄灯" : "") + "——按下方建议调整后再用本假设测算。"; color = "var(--red)"; }
+  $("verdictLine").textContent = verdict;
+  $("verdictLine").style.color = color;
+
+  /* 专项说明 */
+  const others = [];
+  if (s.consumer > 0) others.push("消费资产 " + fmt(s.consumer) + " 元（折旧中，不计入组合）");
+  if (s.restricted > 0) others.push("限用途资产 " + fmt(s.restricted) + " 元（公积金等，不可自由调仓）");
+  $("exclLine").innerHTML = others.length
+    ? "<b>不计入组合：</b>" + others.join("；") + "。它们影响总资产观感，但不产生可自由使用的 4%。"
+    : "没有消费类/限用途资产需要排除。";
+
+  /* 建议：红→黄排序，金额化，最多 4 条 */
+  const sug = [];
+  if (c.esopShare > 0.2) {
+    const cap = 0.2 * c.income, excess = s.esop - cap;
+    sug.push({ lv: c.esopShare > 0.4 ? 0 : 1, t: "🔴 公司股权超上限：占生息组合 " + pct(c.esopShare) + "，超出 " + fmt(excess) + " 元。立即停止新增流入——分红、奖金、认购款不再进入该桶。" });
+  }
+  if (s.monthlyExpense > 0 && c.liqMonths < 6) {
+    const gap = 6 * s.monthlyExpense - c.liq;
+    sug.push({ lv: c.liqMonths < 3 ? 0 : 1, t: (c.liqMonths < 3 ? "🔴" : "🟡") + " 流动性缺口 " + fmt(gap) + " 元：先补足现金/稳健类至 6 个月支出（" + fmt(6 * s.monthlyExpense) + " 元），这是组合的安全气垫。" });
+  }
+  if (c.income > 0) {
+    const lo = c.band[0], hi = c.band[1], share = c.equityShare * 100;
+    if (share < lo) {
+      const gap = lo / 100 * c.income - (s.equity + s.esop);
+      const months = s.monthlyInvest > 0 ? Math.ceil(gap / s.monthlyInvest) : null;
+      sug.push({ lv: off_level(share, c.band), t: (off_level(share, c.band) === 0 ? "🔴" : "🟡") + " 权益类缺口 " + fmt(gap) + " 元" + (months ? "：按每月投入 " + fmt(s.monthlyInvest) + " 元，约 " + months + " 个月补齐（宽基指数/红利类）。" : "。") });
+    } else if (share > hi) {
+      const excess = (s.equity + s.esop) - hi / 100 * c.income;
+      sug.push({ lv: off_level(share, c.band), t: "🟡 权益超配比上限：超出 " + fmt(excess) + " 元。新增现金流优先补现金/稳健类，不再加权益。" });
+    }
+  }
+  if (c.rEff !== null && c.rEff < s.modelR / 100) {
+    sug.push({ lv: (s.modelR / 100 - c.rEff) * 100 > 1 ? 0 : 1, t: "🟡 收益与假设不匹配：组合有效收益 " + pct(c.rEff) + " < 模型 " + s.modelR.toFixed(1) + "%。二选一：按建议调仓；或把财富自由计算器的收益率 r 下调至 " + (c.rEff * 100).toFixed(1) + "% 重算本金需求（所需本会增加）。" });
+  }
+  sug.sort((a, b) => a.lv - b.lv);
+  const list = $("suggList");
+  list.innerHTML = "";
+  if (!sug.length) list.innerHTML = "<li>✅ 没有需要调整的——四个维度全部合格。保持纪律即可。</li>";
+  else sug.slice(0, 4).forEach(x => { const li = document["createElement"]("li"); li.textContent = x.t; list.appendChild(li); });
+
+  function off_level(share, band){ const off = share < band[0] ? band[0] - share : share - band[1]; return off > 10 ? 0 : 1; }
+}
+
+/* 从资金报告导入：读取 FFC_PREFILL.portfolio（report.html 发送按钮自动携带） */
+function tryPrefill(silent){
+  let pre = null;
+  try { pre = JSON.parse(localStorage.getItem("FFC_PREFILL") || "null"); } catch(e){}
+  if (!pre || !pre.portfolio) { if (!silent) alert("没有找到报告持仓数据。\n\n请先打开 report.html → 点「🧮 发送到财富自由计算器」（它会同时携带持仓映射，30 分钟内有效），再回到本页导入。"); return false; }
+  const p = pre.portfolio;
+  const map = { equity: "equity", bond: "bond", cash: "cash", esop: "esop", consumer: "consumer", restricted: "restricted" };
+  Object.entries(map).forEach(([k, id]) => { if (isFinite(p[k])) $(id).value = Math.max(0, p[k]); });
+  if (isFinite(p.monthlyExpense) && p.monthlyExpense > 0) $("monthlyExpense").value = p.monthlyExpense;
+  $("srcStatus").textContent = "已从《" + (pre.label || "资金报告") + "》导入持仓";
+  recalc();
+  return true;
+}
+
+$("fromReport").addEventListener("click", () => tryPrefill(false));
+$("clearAll").addEventListener("click", () => {
+  BUCKETS.forEach(b => $(b.key).value = 0);
+  $("srcStatus").textContent = "";
+  recalc();
+});
+["equity","bond","cash","esop","consumer","restricted","equityR","bondR","cashR","esopR","years","modelR","monthlyExpense","monthlyInvest"]
+  .forEach(id => $(id).addEventListener("input", recalc));
+
+/* 启动：先尝试静默预填，再算一次 */
+tryPrefill(true);
+recalc();
+</script>
+</body>
+</html>

@@ -762,7 +762,19 @@ function renderHero(){
     const btn = el("button", "ffc-btn", m.calculator.btn);
     btn.title = m.calculator.tip || "";
     btn.addEventListener("click", () => {
-      try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields })); } catch(e){}
+      /* 持仓映射：把「现在」分布卡按关键词归入组合体检的六个桶 */
+      const p = { monthlyExpense: parseFloat(m.calculator.fields.spend) || 0 };
+      (DATA.overview.now.rows || []).forEach(r => {
+        if (r.muted) return;
+        const v = parseFloat(String(r.amt).replace(/[≈,]/g, "")) || 0;
+        const n = r.name || "";
+        if (/基金/.test(n)) p.equity = (p.equity || 0) + v;
+        else if (/ESOP|虚拟股/.test(n)) p.esop = (p.esop || 0) + v;
+        else if (/银行|活期|现金|安全垫/.test(n)) p.cash = (p.cash || 0) + v;
+        else if (/公积金|限用途/.test(n)) p.restricted = (p.restricted || 0) + v;
+        else if (/固定资产|车/.test(n)) p.consumer = (p.consumer || 0) + v;
+      });
+      try { localStorage.setItem("FFC_PREFILL", JSON.stringify({ ts: Date.now(), label: m.calculator.label, fields: m.calculator.fields, portfolio: p })); } catch(e){}
       window.open(m.calculator.file, "_blank");
     });
     wrap.appendChild(btn);
