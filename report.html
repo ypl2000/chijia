@@ -453,7 +453,7 @@ const DATA = {
   guide: {
     title: "📖 使用说明（通用模板，当前展示的是示例数据）",
     steps: [
-      "本页全部内容由 <b>DATA 对象</b> 渲染。两种填法：① 点下方「导出/导入我的数据」——数据只存浏览器与 JSON 备份，不改模板文件、升级不丢（推荐）；② 直接编辑本文件顶部 DATA。逐字段说明见仓库 docs/DATA.md。",
+      "本页全部内容由 <b>DATA 对象</b> 渲染。两种填法：① 在第二部分「数据与流水导入」面板导入 JSON 数据包——数据仅存当前标签页会话，关闭浏览器自动清空，长期保留用「导出备份 JSON」（推荐）；② 直接编辑本文件顶部 DATA。逐字段说明见仓库 docs/DATA.md。",
       "第二部分支持<b>流水导入</b>：可直接选择银行流水 PDF（首次需联网加载解析组件，解析在本地完成）或粘贴文本，自动生成流水概况、收入结构、大额支出三节；导入结果存于浏览器本地，可一键清除。",
       "示例中的数字彼此自洽（分布条、占比、合计都对得上），替换时建议保持口径一致：数值统一千分位纯数字；固定资产按残值估值；虚拟股按购入成本计。",
       "填完后点 Hero 上的按钮，可把「月支出/房租」口径带入 <b>财富自由计算器.html</b>（需放在同一文件夹）。",
@@ -605,7 +605,7 @@ const DATA = {
       sections: [
         { id: "sec-2-1", title: "2.1 流水概况（待导入）", blocks: [
           { t: "sub", html: "在「📥 流水导入」中粘贴银行流水文本（电子回单里全选复制即可），本节将自动生成按年汇总表。" },
-          { t: "callout", kind: "ok", html: "<b>提示：</b>解析完全在浏览器本地完成，不上传任何数据；导入结果保存在浏览器 localStorage，可随时清除。" }
+          { t: "callout", kind: "ok", html: "<b>提示：</b>解析完全在浏览器本地完成，不上传任何数据；解析结果仅存当前标签页会话，关闭浏览器自动清空。" }
         ]},
         { id: "sec-2-2", title: "2.2 收入结构（待导入）", blocks: [
           { t: "sub", html: "导入流水后，按「雇主户名关键词 + 摘要关键词」自动分类：月薪 / 年终奖 / 补贴报销，并生成补贴季度分布。" }
@@ -782,43 +782,9 @@ function renderGuide(){
   ol.style.cssText = "margin:0;padding-left:22px;line-height:1.9;font-size:13.5px;";
   g.steps.forEach(s => ol.appendChild(el("li", "", s)));
   body.appendChild(ol);
-  /* 数据导出/导入：用户数据只存 localStorage / JSON 文件，不改模板源码、随版本升级保留 */
-  const DATA_LS = "FRI_DATA_V1";
-  const row = el("div", "");
-  row.style.cssText = "display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;";
-  const mkBtn = (label) => { const b = el("button", "", label); b.style.cssText = "background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);"; return b; };
-  const expBtn = mkBtn("💾 导出我的数据（JSON 备份）");
-  expBtn.addEventListener("click", () => {
-    const payload = JSON.stringify({ app: "chijia", version: 1, exportedAt: new Date().toISOString(), data: DATA }, null, 2);
-    const blob = new Blob([payload], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "finance-report-data.json"; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-  });
-  const impBtn = mkBtn("⬆️ 导入我的数据（选择 JSON 备份）");
-  const fileIn = el("input"); fileIn.type = "file"; fileIn.accept = ".json,application/json"; fileIn.style.display = "none";
-  impBtn.addEventListener("click", () => fileIn.click());
-  fileIn.addEventListener("change", async () => {
-    const f = fileIn.files && fileIn.files[0];
-    if (!f) return;
-    try {
-      const obj = JSON.parse(await f.text());
-      if (!obj || !obj.data || !obj.data.meta || !Array.isArray(obj.data.parts)) throw new Error("结构不符");
-      Object.keys(DATA).forEach(k => delete DATA[k]);
-      Object.assign(DATA, obj.data);
-      try { localStorage.setItem(DATA_LS, JSON.stringify({ savedAt: Date.now(), data: obj.data })); } catch(e){}
-      boot();
-      alert("数据已导入并生效（保存在本浏览器，刷新后仍在）。请再次确认：含有真实数据的 JSON 与 HTML 都不要上传到公共仓库。");
-    } catch (e) {
-      alert("导入失败：" + e.message + "——请选择由「导出我的数据」生成的 JSON 文件。");
-    }
-    fileIn.value = "";
-  });
-  row.appendChild(expBtn); row.appendChild(impBtn); row.appendChild(fileIn);
-  const tip = el("span", "", "数据只存本浏览器 / 备份 JSON 文件，不上传。");
-  tip.style.cssText = "font-size:12px;color:var(--sub);";
-  row.appendChild(tip);
-  body.appendChild(row);
+  const tip = el("p", "", '📥 数据包与流水的导入 / 导出 / 重置，都在第二部分顶部的「数据与流水导入」面板，一处搞定。');
+  tip.style.cssText = "margin:12px 0 0;font-size:12.5px;color:var(--sub);";
+  body.appendChild(tip);
   d.appendChild(body); box.appendChild(d);
 }
 
@@ -978,7 +944,7 @@ function renderFoot(){ $("footBox").textContent = DATA.meta.footer; }
 
 /* =====================================================================
    流水导入 —— 本地解析银行流水文本（交行个人客户交易清单格式等），
-   自动生成 2.1 / 2.2 / 2.3，结果存 localStorage，可清除。不上传。
+   自动生成 2.1 / 2.2 / 2.3，结果会话级保存。不上传。
    ===================================================================== */
 const LS_KEY = "FRI_TXNS_V1";
 
@@ -1120,11 +1086,11 @@ function applyImport(txns, rules, save){
   setB("sec-2-2", blocks.b22, "2.2 收入结构");
   setB("sec-2-3", blocks.b23, "2.3 大额支出（Top 20）");
   boot();
-  if (save !== false) { try { localStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
+  if (save !== false) { try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules, txns })); } catch(e){} }
 }
 function loadStoredImport(){
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = sessionStorage.getItem(LS_KEY);
     if (!raw) return null;
     const obj = JSON.parse(raw);
     if (!obj.txns || !obj.txns.length) return null;
@@ -1181,9 +1147,26 @@ async function extractPdfText(buf){
 /* ---- 导入面板 ---- */
 function buildImporter(){
   const d = el("details", "sec"); d.id = "sec-import";
-  d.appendChild(el("summary", "", "📥 流水导入（本地解析，不上传）<span class=\"chev\">▼</span>"));
+  d.appendChild(el("summary", "", "📥 数据与流水导入 / 备份（本地处理，不上传）<span class=\"chev\">▼</span>"));
   const body = el("div", "sec-body");
   const imp = DATA.meta.importer;
+
+  /* ① 数据包 JSON：导入 / 导出 / 重置（会话级保存，关闭标签页即清空） */
+  body.appendChild(el("h4", "", '① 数据包 JSON <span class="hint">—— 报告全部数据 + 已导入的流水；仅存当前标签页会话，关闭浏览器自动清空、回到示例数据</span>'));
+  const dataRow = el("div", "");
+  dataRow.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;";
+  const mkBtn2 = (label) => { const b = el("button", "ffc-btn", label); b.style.cssText = "background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;"; return b; };
+  const dataFile = el("input"); dataFile.type = "file"; dataFile.accept = ".json,application/json"; dataFile.style.display = "none";
+  const impDataBtn = mkBtn2("⬆️ 导入数据 JSON");
+  const expDataBtn = mkBtn2("💾 导出备份 JSON");
+  const resetBtn = mkBtn2("🔄 重置为示例数据");
+  const dataStatus = el("span", "", ""); dataStatus.id = "dataStatus";
+  dataStatus.style.cssText = "font-size:12.5px;color:var(--sub);";
+  dataRow.appendChild(impDataBtn); dataRow.appendChild(expDataBtn); dataRow.appendChild(resetBtn); dataRow.appendChild(dataFile); dataRow.appendChild(dataStatus);
+  body.appendChild(dataRow);
+
+  /* ② 银行流水解析 */
+  body.appendChild(el("h4", "", '② 银行流水解析 <span class="hint">—— 生成 2.1 / 2.2 / 2.3</span>'));
   body.appendChild(el("p", "sec-sub", '支持<b>直接选择 PDF</b>（可多选；首次使用需联网加载解析组件，解析本身仍在本地完成）或 .txt / .csv，也可把 PDF 里的文本全选复制粘贴到下面；点「解析并预览」后「应用到报告」。解析按"行号 + 日期 + 时间 + 类型 + C/D + 金额 + 余额 + 账号 + 户名摘要"的流水清单格式逐行识别。'));
   const grid = el("div", "");
   grid.style.cssText = "display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px;";
@@ -1225,6 +1208,57 @@ function buildImporter(){
   /* 交互（注意：此时 d 尚未入文档，须用局部查询而非 getElementById） */
   let lastTxns = null, lastRules = null;
   const q = (sel) => d.querySelector(sel);
+
+  /* ① 数据包：导出 / 导入 / 重置（会话级） */
+  const DATA_KEY = "FRI_DATA_V1";
+  const refreshDataStatus = () => {
+    try {
+      const raw = sessionStorage.getItem(DATA_KEY);
+      const st = q("#dataStatus");
+      if (!st) return;
+      if (!raw) { st.textContent = "当前：示例数据（导入后仅存本标签页，关闭浏览器自动清空）"; return; }
+      const obj = JSON.parse(raw);
+      st.textContent = "当前：已载入数据包 · " + new Date(obj.savedAt).toLocaleString() + "（关闭浏览器自动清空）";
+    } catch(e){}
+  };
+  impDataBtn.addEventListener("click", () => dataFile.click());
+  dataFile.addEventListener("change", async () => {
+    const f = dataFile.files && dataFile.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      if (!obj || !obj.data || !obj.data.meta || !Array.isArray(obj.data.parts)) throw new Error("结构不符");
+      Object.keys(DATA).forEach(k => delete DATA[k]);
+      Object.assign(DATA, obj.data);
+      try { sessionStorage.setItem(DATA_KEY, JSON.stringify({ savedAt: Date.now(), data: obj.data })); } catch(e){}
+      if (obj.txns && obj.txns.length) {
+        try { sessionStorage.setItem(LS_KEY, JSON.stringify({ rules: obj.txnsRules || DATA.meta.importer, txns: obj.txns })); } catch(e){}
+      }
+      boot();
+      refreshDataStatus();
+      alert("数据已导入并生效。注意：仅保存在当前标签页会话——关闭浏览器后自动回到示例数据；长期保留请点「💾 导出备份 JSON」。");
+    } catch (e) {
+      alert("导入失败：" + e.message + "——请选择由「💾 导出备份 JSON」生成的文件。");
+    }
+    dataFile.value = "";
+  });
+  expDataBtn.addEventListener("click", () => {
+    let txns = null, txnsRules = null;
+    try { const raw = sessionStorage.getItem(LS_KEY); if (raw) { const o = JSON.parse(raw); txns = o.txns; txnsRules = o.rules; } } catch(e){}
+    const payload = JSON.stringify({ app: "chijia", version: 1, exportedAt: new Date().toISOString(), data: DATA, txns, txnsRules }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "chijia-data.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  });
+  resetBtn.addEventListener("click", () => {
+    if (!confirm("重置为示例数据？当前载入的数据包与已导入的流水将被清除（不影响你导出的备份文件）。")) return;
+    sessionStorage.removeItem(DATA_KEY);
+    sessionStorage.removeItem(LS_KEY);
+    location.reload();
+  });
+  refreshDataStatus();
+
   const readRules = () => ({
     employer: q("#impEmployer").value.trim() || imp.employer,
     salaryAbstract: imp.salaryAbstract,
@@ -1279,8 +1313,8 @@ function buildImporter(){
     applyImport(lastTxns, lastRules, true);
   });
   q("#impClear").addEventListener("click", () => {
-    localStorage.removeItem(LS_KEY);
-    q("#impStatus").textContent = "已清除本地导入数据；刷新页面后报告恢复为模板内容。";
+    sessionStorage.removeItem(LS_KEY);
+    q("#impStatus").textContent = "已清除本次解析的流水（关闭标签页同样会自动清空）。";
     q("#impPreview").innerHTML = "";
   });
   return d;
@@ -1306,10 +1340,14 @@ function bindInteractions(){
 function boot(){
   renderHero(); renderGuide(); renderOverview(); renderParts(); renderFoot(); bindInteractions();
 }
-/* 若本浏览器保存过用户数据（导入的 JSON），启动时覆盖示例数据 */
+/* 若本标签页会话中载入过数据包（导入的 JSON），启动时覆盖示例数据；
+   数据一律会话级（sessionStorage）——关闭浏览器即回到示例，磁盘不留痕迹 */
 (function restoreSavedData(){
   try {
-    const raw = localStorage.getItem("FRI_DATA_V1");
+    /* 旧版本曾存 localStorage，迁移期清理 */
+    localStorage.removeItem("FRI_DATA_V1");
+    localStorage.removeItem("FRI_TXNS_V1");
+    const raw = sessionStorage.getItem("FRI_DATA_V1");
     if (!raw) return;
     const obj = JSON.parse(raw);
     if (obj && obj.data && obj.data.meta && Array.isArray(obj.data.parts)) Object.assign(DATA, obj.data);
