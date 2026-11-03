@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <meta name="description" content="持家 · 个人财务双端应用（数据仅存本机）">
+  <title>持家 · 首页</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body>
+
+  <!-- 六 Tab 顶栏（UX-SPEC §1：六 Tab 职责互斥） -->
+  <header class="topbar">
+    <nav class="tabs" role="tablist" aria-label="主导航">
+      <button class="tab is-active" role="tab" aria-selected="true"  aria-controls="view-home"       data-tab="home">🏠<span>首页</span></button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="view-plan"        data-tab="plan">📋<span>计划</span></button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="view-analysis"    data-tab="analysis">🔎<span>分析</span></button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="view-calculator"  data-tab="calculator">🧮<span>计算器</span></button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="view-portfolio"   data-tab="portfolio">🧪<span>体检</span></button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="view-settings"    data-tab="settings">⚙️<span>设置</span></button>
+    </nav>
+  </header>
+
+  <main class="stage">
+
+    <!-- 🏠 首页：壳内原生视图（引导与入口，不放任何数据表格/参数输入） -->
+    <section class="view is-active" id="view-home" role="tabpanel" aria-label="首页" data-view="home">
+      <div class="home-hero">
+        <h1>持家 🏠</h1>
+        <p>个人财务「持家」：账本 + 计划推演 + 流水分析 + 组合体检。数据全部留在本机，无遥测。</p>
+      </div>
+
+      <div class="page">
+
+        <!-- 引导四步（折叠面板默认展开，UX-SPEC §3） -->
+        <details class="panel" id="home-guide" open>
+          <summary>四步上手</summary>
+          <div class="panel-body">
+            <div class="card-grid">
+              <div class="card">
+                <h3>① 建账本</h3>
+                <p>设置页导入数据包 JSON——这是账本主数据：资产、计划、分析的完整快照。</p>
+              </div>
+              <div class="card">
+                <h3>② 导流水</h3>
+                <p>设置页选择银行流水 PDF（或粘贴文本），本机解析、预览确认后应用到分析页。</p>
+              </div>
+              <div class="card">
+                <h3>③ 调计划</h3>
+                <p>计划页参数面板调整月度四池与收益率假设，一键重算 1.1~1.4 与期末预期。</p>
+              </div>
+              <div class="card">
+                <h3>④ 做备份</h3>
+                <p>设置页导出备份 JSON 或创建快照，把成果固化下来，随时可回滚。</p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 数据规则说明 -->
+        <details class="panel" id="home-rules" open>
+          <summary>数据规则</summary>
+          <div class="panel-body">
+            <p><b>账本 · 主数据源</b>：DATA 数据包是资产、计划、分析的完整快照。</p>
+            <p><b>凭证 · 补充输入</b>：银行流水 PDF 只更新流水统计（分析页 2.x）与当期余额，不覆盖账本其他内容。</p>
+            <p><b>隐私边界</b>：流水解析在本机浏览器完成，原始 PDF 不上传、不落库；同步仅在自建后端与本机之间进行。</p>
+            <div class="callout ok">金额口径：千分位纯数字；计划页整数、流水页两位小数；带 <b>≈</b> 前缀表示估算值。</div>
+          </div>
+        </details>
+
+        <!-- 直达按钮组（章程 D2：跳转后目标面板自动展开并滚动到位） -->
+        <details class="panel" id="home-quick" open>
+          <summary>直达入口</summary>
+          <div class="panel-body">
+            <div class="quick-actions">
+              <button class="btn btn-primary" data-go="settings" data-hook="focusImporter">📥 去导入流水</button>
+              <button class="btn btn-primary" data-go="plan" data-hook="focusParams">🎛 去调参数</button>
+              <button class="btn btn-primary" data-go="analysis">🔎 去分析</button>
+            </div>
+            <p class="hint">三个按钮分别直达：设置页导入面板（自动展开）、计划页参数面板（自动展开并滚动到位）、分析页。</p>
+          </div>
+        </details>
+
+      </div>
+    </section>
+
+    <!-- 其余五 Tab：iframe 惰性加载（首次点击才设 src；切换只改 display，状态保留） -->
+    <section class="view" id="view-plan" role="tabpanel" aria-label="计划" data-view="plan" hidden>
+      <iframe id="frame-plan" data-src="plan.html" title="计划"></iframe>
+    </section>
+    <section class="view" id="view-analysis" role="tabpanel" aria-label="分析" data-view="analysis" hidden>
+      <iframe id="frame-analysis" data-src="analysis.html" title="分析"></iframe>
+    </section>
+    <section class="view" id="view-calculator" role="tabpanel" aria-label="计算器" data-view="calculator" hidden>
+      <iframe id="frame-calculator" data-src="calculator.html" title="计算器"></iframe>
+    </section>
+    <section class="view" id="view-portfolio" role="tabpanel" aria-label="体检" data-view="portfolio" hidden>
+      <iframe id="frame-portfolio" data-src="portfolio.html" title="体检"></iframe>
+    </section>
+    <section class="view" id="view-settings" role="tabpanel" aria-label="设置" data-view="settings" hidden>
+      <iframe id="frame-settings" data-src="settings.html" title="设置"></iframe>
+    </section>
+
+  </main>
+
+  <script type="module">
+    /* 持家壳 · Tab 切换 + iframe 惰性加载 + 直达钩子（章程 D2） */
+
+    const PAGES = ['plan', 'analysis', 'calculator', 'portfolio', 'settings'];
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+    const views = Object.fromEntries(
+      Array.from(document.querySelectorAll('.view')).map((v) => [v.dataset.view, v]),
+    );
+    let current = 'home';
+
+    function setDisplay(name) {
+      for (const p of PAGES) views[p].hidden = p !== name;
+      views.home.hidden = name !== 'home';
+      for (const t of tabs) {
+        const on = t.dataset.tab === name;
+        t.classList.toggle('is-active', on);
+        t.setAttribute('aria-selected', String(on));
+      }
+    }
+
+    /** 惰性加载：首次调用才设 src；已加载立即返回 */
+    function ensureFrame(name) {
+      const f = document.getElementById('frame-' + name);
+      if (f.getAttribute('src')) return Promise.resolve(f);
+      return new Promise((resolve) => {
+        f.addEventListener('load', () => resolve(f), { once: true });
+        f.src = f.dataset.src;
+      });
+    }
+
+    async function activate(name, hook) {
+      if (!views[name]) return;
+      if (name !== current) {
+        setDisplay(name);
+        current = name;
+        try { history.replaceState(null, '', '#' + name); } catch { /* file:// 下可能受限 */ }
+      }
+      if (name !== 'home') {
+        const frame = await ensureFrame(name);
+        if (hook && frame.contentWindow) {
+          try {
+            // 页内模块通过 window.__chijia 暴露直达钩子（如 focusImporter / focusParams）
+            frame.contentWindow.__chijia?.[hook]?.();
+          } catch (e) {
+            console.warn('[chijia] 直达钩子执行失败：', name, hook, e);
+          }
+        }
+      }
+    }
+
+    for (const t of tabs) t.addEventListener('click', () => activate(t.dataset.tab));
+    for (const b of document.querySelectorAll('[data-go]')) {
+      b.addEventListener('click', () => activate(b.dataset.go, b.dataset.hook));
+    }
+
+    // 支持 #plan 等 hash 直达（QA/分享链接用）
+    const initial = location.hash.slice(1);
+    if (initial && views[initial]) activate(initial);
+
+    // PWA Service Worker 注册（失败静默：本地预览 file:// 或旧浏览器）
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

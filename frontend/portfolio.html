@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <title>持家 · 体检</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body data-page="portfolio">
+
+  <header class="page-head">
+    <h1>🧪 体检</h1>
+    <p class="page-sub">组合四维红绿灯（独立工具页；金额单位为「元」）</p>
+  </header>
+
+  <main class="page">
+    <section id="pf-form-mount" aria-label="持仓录入"></section>
+    <section id="pf-mount" aria-label="组合体检结果">
+      <p class="empty">填入持仓后自动生成四维红绿灯体检报告。</p>
+    </section>
+    <p class="hint">四维口径（示例模型，非投资建议）：①集中度——最大单一持仓 ≤30% 🟢 / ≤50% 🟡 / 更高 🔴；②分散度——持仓品种 ≥5 🟢 / 3~4 🟡 / 更少 🔴；③现金覆盖——现金类占比 ≥10% 🟢 / ≥5% 🟡 / 更低 🔴；④个股占比——≤40% 🟢 / ≤60% 🟡 / 更高 🔴。持仓保存在本机 IndexedDB（pf_holdings 实体）。</p>
+  </main>
+
+  <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
+
+  <script type="module">
+    /**
+     * 体检：独立工具页，独立初始化（不调用 core.boot）。
+     * 持仓记忆存 idb 实体 pf_holdings（跨会话）；四维红绿灯 + 空态引导。
+     * 同步协议与 core 对齐（BUG-007）：保存动作先 commitChange 后 flushOutbox
+     * （离线静默，留待 online/下次 flush 重试），并挂 installAutoSync 自动重试。
+     * O-4：订阅 sync.js 的「sync-applied」采纳广播（BroadcastChannel 跨 iframe +
+     * window 事件），pf_holdings 命中即重读重渲染——壳内隐藏 iframe（Tab 切换仅
+     * display）在设置页「立即同步」后切回即为最新，不再需要整页刷新。
+     */
+    import { renderBlocks } from './src/core.js';
+    import { commitChange, kvGet } from './src/idb.js';
+    import { flushOutbox, installAutoSync, removeEntity } from './src/sync.js';
+
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, cls, html) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (html != null) n.innerHTML = html;
+      return n;
+    };
+    const fmtInt = (v) => String(Math.round(Number(v) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    const TYPES = ['指数基金', '个股', '债券', '货币现金', '黄金', '其他'];
+    const TYPE_COLORS = { 指数基金: '#4e8cff', 个股: '#8f6bd6', 债券: '#2fbf71', 货币现金: '#e8a13c', 黄金: '#d4a017', 其他: '#9aa4b2' };
+
+    let holdings = []; // [{name, type, amt}]
+
+    /* ------------------------------ 持仓录入表单 ------------------------------ */
+
+    function buildForm(mount) {
+      mount.textContent = '';
+      const row = el('div', 'form-row');
+      const mk = (labelText, inputEl) => {
+        const lab = el('label', null, `<span>${labelText}</span>`);
+        lab.appendChild(inputEl);
+        return lab;
+      };
+      const name = el('input');
+      name.type = 'text';
+      name.placeholder = '如：沪深300指数';
+      const type = el('select');
+      type.innerHTML = TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
+      const amt = el('input');
+      amt.type = 'number';
+      amt.min = '0';
+      amt.step = '100';
+      amt.placeholder = '金额（元）';
+      const btnAdd = el('button', 'btn btn-primary', '＋ 添加持仓');
+      btnAdd.type = 'button';
+      btnAdd.addEventListener('click', async () => {
+        const n = name.value.trim();
+        const a = Number(amt.value);
+        if (!n) { alert('请填写持仓名称。'); return; }
+        if (!Number.isFinite(a) || a <= 0) { alert('金额请填写大于 0 的数字。'); return; }
+        holdings = [...holdings, { name: n, type: type.value, amt: a }];
+        name.value = '';
+        amt.value = '';
+        await persist();
+      });
+      row.append(mk('持仓名称', name), mk('类型', type), mk('金额（元）', amt), btnAdd);
+      mount.appendChild(row);
+
+      const btnClear = el('button', 'btn btn-danger', '🗑 清空持仓');
+      btnClear.type = 'button';
+      btnClear.addEventListener('click', async () => {
+        if (!holdings.length) { alert('当前没有持仓记录。'); return; }
+        if (!confirm('清空全部持仓（pf_holdings 实体，D23 墓碑删除）？')) return;
+        holdings = [];
+        await removeEntity('pf_holdings');
+        renderAll();
+      });
+      mount.appendChild(btnClear);
+    }
+
+    async function persist() {
+      await commitChange('pf_holdings', { items: holdings }); // BUG-004①：先 await commitChange
+      flushOutbox().catch(() => { /* BUG-007：离线静默，留待 online/下次 flush */ }); // 再 flush
+      renderAll();
+    }
+
+    /* ------------------------------ 四维红绿灯 ------------------------------ */
+
+    /** @returns {{h:string, d:string}[]} picgrid 用 */
+    function evaluate(items) {
+      const total = items.reduce((s, x) => s + x.amt, 0) || 1;
+      const pct = (v) => (v / total) * 100;
+      const top = Math.max(...items.map((x) => x.amt));
+      const kinds = new Set(items.map((x) => x.type));
+      const cash = items.filter((x) => x.type === '货币现金').reduce((s, x) => s + x.amt, 0);
+      const stock = items.filter((x) => x.type === '个股').reduce((s, x) => s + x.amt, 0);
+
+      const d1 = pct(top);
+      const l1 = d1 <= 30 ? '🟢' : d1 <= 50 ? '🟡' : '🔴';
+      const n = items.length;
+      const l2 = n >= 5 ? '🟢' : n >= 3 ? '🟡' : '🔴';
+      const d3 = pct(cash);
+      const l3 = d3 >= 10 ? '🟢' : d3 >= 5 ? '🟡' : '🔴';
+      const d4 = pct(stock);
+      const l4 = d4 <= 40 ? '🟢' : d4 <= 60 ? '🟡' : '🔴';
+
+      return [
+        { h: `${l1} 集中度`, d: `最大单一持仓 ${d1.toFixed(1)}%（≤30% 达标）` },
+        { h: `${l2} 分散度`, d: `${n} 个持仓（≥5 个达标）` },
+        { h: `${l3} 现金覆盖`, d: `现金类占比 ${d3.toFixed(1)}%（≥10% 达标）` },
+        { h: `${l4} 个股占比`, d: `个股 ${d4.toFixed(1)}%（≤40% 达标）` },
+      ];
+    }
+
+    function renderResult(mount) {
+      mount.textContent = '';
+      if (!holdings.length) {
+        mount.appendChild(el('div', 'empty',
+          '还没有持仓记录——在上方填入持仓后自动生成四维红绿灯体检报告；数据仅存本机。'));
+        return;
+      }
+      const total = holdings.reduce((s, x) => s + x.amt, 0);
+
+      const lights = el('div', null);
+      renderBlocks(lights, [{ t: 'picgrid', items: evaluate(holdings) }]);
+      mount.appendChild(lights);
+
+      const dist = el('div', null);
+      renderBlocks(dist, [{
+        t: 'distrows',
+        rows: TYPES
+          .map((t) => ({ name: t, amt: holdings.filter((x) => x.type === t).reduce((s, x) => s + x.amt, 0) }))
+          .filter((r) => r.amt > 0)
+          .map((r) => ({ name: r.name, w: Math.round((r.amt / total) * 100), color: TYPE_COLORS[r.name], pct: ((r.amt / total) * 100).toFixed(1) + '%' })),
+      }]);
+      mount.appendChild(dist);
+
+      const wrap = el('div', 'table-wrap');
+      const table = el('table', 'data-table');
+      table.innerHTML = '<thead><tr><th>持仓</th><th>类型</th><th>金额(元)</th><th>占比</th><th></th></tr></thead>';
+      const tbody = el('tbody');
+      [...holdings]
+        .sort((a, b) => b.amt - a.amt)
+        .forEach((h) => {
+          const tr = el('tr');
+          tr.innerHTML =
+            `<td>${h.name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td><td>${h.type}</td>` +
+            `<td class="num">${fmtInt(h.amt)}</td><td class="num">${((h.amt / total) * 100).toFixed(1)}%</td>`;
+          const td = el('td');
+          const btn = el('button', 'btn', '删除');
+          btn.type = 'button';
+          btn.addEventListener('click', async () => {
+            if (!confirm(`删除持仓「${h.name}」？`)) return;
+            holdings = holdings.filter((x) => x !== h && !(x.name === h.name && x.amt === h.amt && x.type === h.type));
+            await persist();
+          });
+          td.appendChild(btn);
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+        });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      mount.appendChild(wrap);
+      mount.appendChild(el('p', 'hint', `合计 ${fmtInt(total)} 元 · 保存于本机 pf_holdings 实体，改版/重启不丢失。`));
+    }
+
+    function renderAll() {
+      renderResult($('pf-mount'));
+      document.body.dataset.holdings = String(holdings.length);
+    }
+
+    /* --------------------------------- 装配 --------------------------------- */
+
+    /** 从 idb 重读 pf_holdings 到内存（boot 装配与 O-4 同步事件订阅共用） */
+    async function loadHoldings() {
+      try {
+        const rec = await kvGet('pf_holdings');
+        holdings = rec && !rec.deleted && Array.isArray(rec.value?.items) ? rec.value.items : [];
+      } catch { /* idb 不可用：空态 */ }
+    }
+
+    /** O-4：同步采纳（含墓碑）命中 pf_holdings → 重读重渲染（幂等，不回写不循环） */
+    function reloadFromStore() {
+      loadHoldings().then(renderAll).catch(() => { /* 保持现状 */ });
+    }
+    addEventListener('chijia:applied', (e) => {
+      if (Array.isArray(e.detail?.entities) && e.detail.entities.includes('pf_holdings')) reloadFromStore();
+    });
+    try {
+      const bcSync = new BroadcastChannel('chijia');
+      bcSync.addEventListener('message', (e) => {
+        if (e.data?.type === 'sync-applied' && Array.isArray(e.data.entities) &&
+            e.data.entities.includes('pf_holdings')) reloadFromStore();
+      });
+    } catch { /* 无 BroadcastChannel 环境（同窗口事件通道兜底） */ }
+
+    installAutoSync(); // BUG-007：online 事件自动补发 outbox（与 core.boot 侧协议对齐）
+    buildForm($('pf-form-mount'));
+    await loadHoldings();
+    renderAll();
+    document.body.dataset.ready = 'portfolio';
+
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# 运行时数据：token / 数据库 / 本地配置 —— 严禁入库（隐私红线）
+backend/data/
+__pycache__/
+*.pyc
+
+# 内部项目治理文档与测试证据（含本机路径、启动日志中的 token 打印）——不入公开库
+pm/
+tests/evidence/
+
+# 系统杂项
+.DS_Store
+Thumbs.db

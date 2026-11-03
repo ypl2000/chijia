@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <title>持家 · 计算器</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body data-page="calculator">
+
+  <header class="page-head">
+    <h1>🧮 计算器</h1>
+    <p class="page-sub">FIRE 三档模型（独立工具页；内部金额单位为「万」，勿与「元」混用）</p>
+  </header>
+
+  <main class="page">
+    <!-- FFC_PREFILL 预填横幅（深底浅字，深浅主题均可读） -->
+    <div class="banner" id="prefill-banner" hidden>
+      <span id="prefill-text"></span>
+      <button class="banner-close" id="prefill-close" type="button" aria-label="关闭">✕</button>
+    </div>
+
+    <section id="calc-mount" aria-label="FIRE 三档模型">
+      <p class="empty">调整月收入 / 月支出 / 收益率 / 本金后，三档（轻盈 / 标准 / 富裕）年限实时更新。</p>
+    </section>
+
+    <p class="hint">档位口径：目标本金 = 年支出 × 20（轻盈）/ × 30（标准）/ × 40（富裕）；示例模型，非投资建议。报告页「发送」会把收入/支出/本金预填到本页（FFC_PREFILL，30 分钟内有效）。</p>
+  </main>
+
+  <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
+
+  <script type="module">
+    /**
+     * 计算器：独立工具页，独立初始化（不调用 core.boot，不依赖计划/分析数据）。
+     * 内部金额单位「万」：输入输出均以万计（1.5 = 1.5 万 = 15,000 元）。
+     */
+
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, cls, html) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (html != null) n.innerHTML = html;
+      return n;
+    };
+    /** 万 → 千分位字符串（≤2 位小数） */
+    const fw = (v) => {
+      const n = Number(v) || 0;
+      const s = (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+      return s;
+    };
+
+    /* ----------------------------- 三档 FIRE 模型 ----------------------------- */
+
+    const TIERS = [
+      { key: 'lean', name: '🪶 轻盈（lean）', mult: 20, desc: '年支出 × 20' },
+      { key: 'comfort', name: '🏡 标准（comfort）', mult: 30, desc: '年支出 × 30' },
+      { key: 'rich', name: '🌊 富裕（rich）', mult: 40, desc: '年支出 × 40' },
+    ];
+
+    /**
+     * 达到目标本金所需年数：月度复利 + 月结余定投；超过 100 年视为达不到。
+     * @returns {number|null} 年数（1 位小数）；达不到返回 null
+     */
+    function yearsToTarget(targetWan, monthlySaveWan, rate, principalWan) {
+      const rm = rate / 12;
+      let bal = principalWan;
+      for (let m = 1; m <= 1200; m++) {
+        bal = bal * (1 + rm) + monthlySaveWan;
+        if (bal >= targetWan) return Math.round((m / 12) * 10) / 10;
+      }
+      return null;
+    }
+
+    const state = { income: 1.5, spend: 0.6, rate: 0.05, principal: 50 };
+
+    function buildCalc(mount) {
+      mount.textContent = '';
+      const grid = el('div', 'pp-grid');
+      const fields = [
+        ['income', '月收入（万）', 0.1],
+        ['spend', '月支出（万）', 0.1],
+        ['principal', '当前本金（万）', 1],
+      ];
+      const inputs = {};
+      for (const [key, label, step] of fields) {
+        const lab = el('label', 'pp-field', `<span>${label}</span>`);
+        const input = el('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = String(step);
+        input.value = String(state[key]);
+        input.addEventListener('input', () => {
+          const v = Number(input.value);
+          if (Number.isFinite(v) && v >= 0) { state[key] = v; render(); }
+        });
+        lab.appendChild(input);
+        grid.appendChild(lab);
+        inputs[key] = input;
+      }
+      {
+        const lab = el('label', 'pp-field', '<span>年化收益率（%）</span>');
+        const input = el('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = '0.5';
+        input.value = String(Math.round(state.rate * 1000) / 10);
+        input.addEventListener('input', () => {
+          const v = Number(input.value);
+          if (Number.isFinite(v) && v >= 0) { state.rate = v / 100; render(); }
+        });
+        lab.appendChild(input);
+        grid.appendChild(lab);
+        inputs.rate = input;
+      }
+      mount.appendChild(grid);
+
+      const result = el('div', 'calc-result');
+      mount.appendChild(result);
+      render();
+
+      /** 参数改动实时更新（UX-SPEC 流程③） */
+      function render() {
+        result.textContent = '';
+        const save = Math.max(0, state.income - state.spend);
+        const head = el('div', 'callout');
+        // 结余为负时给出红字提醒（禁止静默）
+        if (state.income < state.spend) {
+          head.className = 'callout danger';
+          head.innerHTML = `⚠ 月收入 ${fw(state.income)} 万 < 月支出 ${fw(state.spend)} 万：当前入不敷出，无法积累本金。`;
+        } else {
+          head.className = 'callout';
+          head.innerHTML = `月结余 <b>${fw(save)} 万</b>（月收入 ${fw(state.income)} − 月支出 ${fw(state.spend)}）· 年支出 ${fw(state.spend * 12)} 万 · 年化 ${Math.round(state.rate * 1000) / 10}%`;
+        }
+        result.appendChild(head);
+
+        const grid2 = el('div', 'card-grid');
+        for (const tier of TIERS) {
+          const target = state.spend * 12 * tier.mult;
+          const years = yearsToTarget(target, save, state.rate, state.principal);
+          const card = el('div', 'card stat-card');
+          card.appendChild(el('div', 'stat-lab hint', tier.name + ' · ' + tier.desc));
+          card.appendChild(el('div', 'stat-val num', years == null ? '100 年+' : `${years} 年`));
+          card.appendChild(el('div', 'stat-note hint', `目标本金 ${fw(target)} 万`));
+          grid2.appendChild(card);
+        }
+        result.appendChild(grid2);
+      }
+    }
+
+    /* --------------------------- FFC_PREFILL（D5 保留） --------------------------- */
+
+    function applyPrefill() {
+      let pre;
+      try {
+        pre = JSON.parse(localStorage.getItem('FFC_PREFILL') ?? 'null');
+      } catch { pre = null; }
+      if (!pre || !pre.fields) return;
+      if (!Number.isFinite(Number(pre.ts)) || Date.now() - Number(pre.ts) > 30 * 60 * 1000) {
+        try { localStorage.removeItem('FFC_PREFILL'); } catch { /* 忽略 */ }
+        return;
+      }
+      // 元 → 万（跨页契约：报告页以元计，计算器内部以万计）
+      const toWan = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) / 10000 : null);
+      const income = toWan(pre.fields.income);
+      const spend = toWan(pre.fields.spend);
+      const base = toWan(pre.fields.base);
+      if (income != null) state.income = Math.round(income * 100) / 100;
+      if (spend != null) state.spend = Math.round(spend * 100) / 100;
+      if (base != null) state.principal = Math.round(base * 100) / 100;
+
+      const parts = [
+        income != null ? `月收入 ${fw(state.income)} 万` : null,
+        spend != null ? `月支出 ${fw(state.spend)} 万` : null,
+        base != null ? `本金 ${fw(state.principal)} 万` : null,
+      ].filter(Boolean);
+      // M1-O-4（P4）：label 本身可能已带「来自」前缀（默认数据包为「来自计划页」），
+      // 剥掉再套「来自「…」」模板，避免渲染成「来自「来自计划页」」叠字
+      const rawLabel = String(pre.label ?? '报告页');
+      const label = rawLabel.replace(/^来自/, '') || rawLabel;
+      $('prefill-text').textContent =
+        `已自动填入来自「${label}」的参数：${parts.join(' · ')}（30 分钟内有效）。`;
+      $('prefill-banner').hidden = false;
+      $('prefill-close').addEventListener('click', () => { $('prefill-banner').hidden = true; });
+    }
+
+    applyPrefill();
+    buildCalc($('calc-mount'));
+    document.body.dataset.ready = 'calculator';
+
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

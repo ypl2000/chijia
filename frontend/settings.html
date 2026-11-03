@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <title>持家 · 设置</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body data-page="settings">
+
+  <header class="page-head">
+    <h1>⚙️ 设置</h1>
+    <p class="page-sub">数据操作唯一入口：①数据包备份 ②流水导入 ③收入口径 ④同步与连接（不含任何分析结论）</p>
+  </header>
+
+  <main class="page">
+    <!-- ① 数据包备份（导出/导入 JSON + 快照管理） -->
+    <details class="panel" id="panel-backup" open>
+      <summary>① 数据包备份</summary>
+      <div class="panel-body" id="backup-mount">
+        <div class="status-line"></div>
+        <div class="panel-content"><p class="empty">数据装载中…</p></div>
+      </div>
+    </details>
+
+    <!-- ② 流水导入（默认展开，UX-SPEC §3；#importer 直达展开并滚动到位） -->
+    <details class="panel" id="panel-import" open>
+      <summary>② 流水导入</summary>
+      <div class="panel-body" id="importer-mount">
+        <div class="status-line"></div>
+        <div class="panel-content"><p class="empty">数据装载中…</p></div>
+      </div>
+    </details>
+
+    <!-- ③ 收入口径（月支出 + importer 分类规则） -->
+    <details class="panel" id="panel-income" open>
+      <summary>③ 收入口径</summary>
+      <div class="panel-body" id="income-mount">
+        <div class="status-line"></div>
+        <div class="panel-content"><p class="empty">数据装载中…</p></div>
+      </div>
+    </details>
+
+    <!-- ④ 同步与连接（token / lastSync / 立即同步） -->
+    <details class="panel" id="panel-sync" open>
+      <summary>④ 同步与连接</summary>
+      <div class="panel-body" id="sync-mount">
+        <div class="status-line"></div>
+        <div class="panel-content"><p class="empty">数据装载中…</p></div>
+      </div>
+    </details>
+  </main>
+
+  <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
+
+  <script type="module">
+    import {
+      boot, rerender, getCurrentData, parseLines, classify, aggregate,
+      computeIncome12m, applyImport, extractPdfText, esc, fmtMoney,
+    } from './src/core.js';
+    import {
+      fetchSnapshots, createSnapshot, restoreSnapshot, removeEntity,
+      ensureSafetySnapshot, getAuthToken, setAuthToken, getDeviceId,
+      flushOutbox, pullState,
+    } from './src/sync.js';
+    import { kvGet, commitChange, metaGet } from './src/idb.js';
+    import { FORMATS } from './src/formats.js';
+
+    boot('settings');
+
+    /* --------------------------------- 小工具 --------------------------------- */
+
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, cls, html) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (html != null) n.innerHTML = html; // 仅拼接本页受控模板 + esc() 后的用户值
+      return n;
+    };
+    /** 状态行写在 panel-body（重建只清 .panel-content，不抹状态行） */
+    const statusIn = (mount, kind, msg) => {
+      const box = mount.querySelector('.status-line') ?? mount.appendChild(el('div', 'status-line'));
+      box.className = 'status-line' + (kind ? ' callout ' + kind : '');
+      box.textContent = msg;
+      return box;
+    };
+    const contentOf = (mount) => mount.querySelector('.panel-content') ?? mount;
+    const splitList = (s) => String(s ?? '').split(/[,，;；\n]/).map((x) => x.trim()).filter(Boolean);
+    /** BUG-002/D17 修订：快照失败时的人工确认钩子（D28：原生 confirm） */
+    const confirmLoss = (err) =>
+      confirm(`自动快照创建失败（${err.message}）。\n没有快照保护，仍要继续本次覆盖写吗？`);
+
+    let bc;
+    try { bc = new BroadcastChannel('chijia'); } catch { /* 忽略 */ }
+
+    /** BUG-009：快照面板刷新句柄（buildBackup 每次装配时注册）。
+     *  token 保存/清除只改连接态、不触发数据重渲染，需主动刷新快照面板：
+     *  清除 → 即时显示「不可用（缺少 token）」；保存有效 token → 即时拉取列表。 */
+    let refreshSnapshotList = null;
+
+    /** 数据变更后：刷新本页缓存 + 广播其他 iframe + 补发 outbox（BUG-004①：先 commit 后 flush）。
+     *  面板重建由 'chijia:rendered' 事件统一驱动（rerender 内广播），含快照列表与同步状态（D27）。 */
+    async function afterDataChange(mount, msg) {
+      await rerender();
+      try { bc?.postMessage({ type: 'data-changed' }); } catch { /* 忽略 */ }
+      flushOutbox().catch(() => { /* 离线：留待 online/立即同步 */ });
+      statusIn(mount, 'ok', msg);
+    }
+
+    /* --------------------------- ① 数据包备份与快照 --------------------------- */
+
+    function buildBackup(mount) {
+      const box = contentOf(mount);
+      box.textContent = '';
+      box.appendChild(el('p', null,
+        '账本主数据（DATA 全量）可导出为备份 JSON 固化，或从数据包导入覆盖。快照保存在自建后端（需 token）。'));
+
+      const row1 = el('div', 'form-row');
+      const btnExport = el('button', 'btn btn-primary', '📤 导出备份 JSON');
+      btnExport.type = 'button';
+      btnExport.addEventListener('click', () => {
+        const data = getCurrentData();
+        if (!data) { alert('账本数据尚未就绪，请稍后重试。'); return; }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = el('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `chijia-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        statusIn(mount, 'ok', '已导出备份 JSON（当前账本全量）。建议每月导流水应用后导出一次。');
+      });
+      const labFile = el('label', null, '<span>导入数据包 JSON（覆盖当前账本主数据）</span>');
+      const file = el('input');
+      file.type = 'file';
+      file.accept = '.json,application/json';
+      labFile.appendChild(file);
+      const btnImport = el('button', 'btn', '📥 导入数据包');
+      btnImport.type = 'button';
+      btnImport.addEventListener('click', async () => {
+        const f = file.files?.[0];
+        if (!f) { alert('请先选择数据包 JSON 文件。'); return; }
+        let obj;
+        try {
+          obj = JSON.parse(await f.text());
+        } catch (e) {
+          alert('导入失败：文件不是合法 JSON（' + e.message + '）。\n下一步：确认导出的是「导出备份 JSON」生成的文件。');
+          return;
+        }
+        if (!obj || typeof obj !== 'object' || !obj.meta || !Array.isArray(obj.parts)) {
+          alert('导入失败：JSON 结构不是 DATA 数据包（缺少 meta 或 parts）。\n下一步：检查是否选错了文件。');
+          return;
+        }
+        if (!confirm('导入数据包将覆盖当前账本主数据（DATA 全量），确认继续？')) return;
+        try {
+          // BUG-002/D17 修订：覆盖型写前自动快照，失败需 confirm 才继续
+          await ensureSafetySnapshot(`自动快照 · 数据包导入前 ${new Date().toLocaleString('zh-CN')}`, { confirmLoss });
+          await commitChange('data', obj);
+        } catch (e) {
+          alert('已中止导入：' + (e?.message ?? e) + '\n下一步：检查后端/token 后重试（数据未被改动）。');
+          return;
+        }
+        await afterDataChange(mount, `已导入数据包「${esc(String(obj.meta?.title ?? '未命名'))}」，账本主数据已覆盖。`);
+      });
+      row1.append(btnExport, labFile, btnImport);
+      box.appendChild(row1);
+
+      const rowDel = el('div', 'form-row');
+      const btnReset = el('button', 'btn btn-danger', '♻️ 恢复示例账本');
+      btnReset.type = 'button';
+      btnReset.addEventListener('click', async () => {
+        if (!confirm('恢复示例账本将删除本机的 DATA 实体（墓碑删除，可同步撤销），确认？')) return;
+        await removeEntity('data');
+        await afterDataChange(mount, '已删除 DATA 实体（D23 墓碑），页面回退内置示例账本。');
+      });
+      rowDel.append(btnReset);
+      box.appendChild(rowDel);
+
+      /* 快照管理 */
+      box.appendChild(el('h4', null, '快照管理'));
+      const snapRow = el('div', 'form-row');
+      const labLabel = el('label', null, '<span>快照标签</span>');
+      const labelInput = el('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = '如：2026-10 月末固化';
+      labLabel.appendChild(labelInput);
+      const btnSnap = el('button', 'btn btn-primary', '📸 创建快照');
+      btnSnap.type = 'button';
+      btnSnap.addEventListener('click', async () => {
+        try {
+          await createSnapshot(labelInput.value.trim() || `快照 ${new Date().toLocaleString('zh-CN')}`);
+          statusIn(mount, 'ok', '快照已创建。');
+          await refreshSnapshots();
+        } catch (e) {
+          alert('创建快照失败：' + e.message + '\n下一步：确认后端已启动、并在「④ 同步与连接」录入正确 token。');
+        }
+      });
+      snapRow.append(labLabel, btnSnap);
+      box.appendChild(snapRow);
+
+      const snapBox = el('div', 'snap-box');
+      box.appendChild(snapBox);
+      async function refreshSnapshots() {
+        snapBox.textContent = '';
+        try {
+          const list = await fetchSnapshots();
+          if (!Array.isArray(list) || !list.length) {
+            snapBox.appendChild(el('p', 'empty', '暂无快照：数据操作前可创建一个，随时可回滚。'));
+            return;
+          }
+          const wrap = el('div', 'table-wrap');
+          const table = el('table', 'data-table');
+          table.innerHTML = '<thead><tr><th>ID</th><th>标签</th><th>时间</th><th>大小</th><th></th></tr></thead>';
+          const tbody = el('tbody');
+          for (const s of list) {
+            const tr = el('tr');
+            tr.innerHTML =
+              `<td>${esc(String(s.id))}</td><td>${esc(String(s.label ?? ''))}</td>` +
+              `<td>${esc(new Date(s.createdAt).toLocaleString('zh-CN'))}</td>` +
+              `<td class="num">${esc(fmtMoney((s.size ?? 0) / 1024))} KB</td>`;
+            const td = el('td');
+            const btn = el('button', 'btn', '↩️ 回滚');
+            btn.type = 'button';
+            btn.addEventListener('click', async () => {
+              if (!confirm(`回滚到快照 #${s.id}（${s.label ?? ''}）？\n当前数据将被快照内容前向覆盖（可再撤销、可同步对端）。`)) return;
+              try {
+                await restoreSnapshot(s.id, { confirmLoss }); // D17 四步：flush → 自动快照 → restore → pull
+                await afterDataChange(mount, `已回滚到快照 #${s.id}，本地已与服务器收敛（回滚前已自动建快照）。`);
+                await refreshSnapshots(); // D27：回滚成功后自动刷新快照列表
+              } catch (e) {
+                alert('回滚失败：' + e.message + '\n下一步：确认后端已启动、token 正确；四步协议任一步失败都会中止，数据不会半途而废。');
+              }
+            });
+            td.appendChild(btn);
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+          }
+          table.appendChild(tbody);
+          wrap.appendChild(table);
+          snapBox.appendChild(wrap);
+        } catch (e) {
+          snapBox.appendChild(el('p', 'empty',
+            `快照列表不可用（${esc(String(e.message ?? e))}）。后端未启动或 token 未设置时不影响本机使用。`));
+        }
+      }
+      refreshSnapshotList = refreshSnapshots; // BUG-009：注册句柄，供 token 保存/清除路径调用
+      refreshSnapshots();
+    }
+
+    /* ------------------------------- ② 流水导入 ------------------------------- */
+
+    function buildImporter(mount) {
+      const box = contentOf(mount);
+      box.textContent = '';
+      box.appendChild(el('p', null,
+        '选择银行流水 PDF 或粘贴文本 → 解析并预览（含笔数）→ 确认后应用到分析页。解析在本机完成，原始 PDF 不上传。'));
+
+      let pending = null; // { txns, failed, rules }
+
+      const modeRow = el('div', 'form-row');
+      const labMode = el('label', null, '<span>来源方式</span>');
+      const mode = el('select');
+      mode.innerHTML = '<option value="pdf">PDF 文件（文字可复制）</option><option value="text">粘贴文本</option>';
+      labMode.appendChild(mode);
+      modeRow.appendChild(labMode);
+      box.appendChild(modeRow);
+
+      const fileRow = el('div', 'form-row');
+      const labFile = el('label', null, '<span>流水 PDF</span>');
+      const file = el('input');
+      file.type = 'file';
+      file.accept = '.pdf,application/pdf';
+      labFile.appendChild(file);
+      fileRow.appendChild(labFile);
+      box.appendChild(fileRow);
+
+      const textRow = el('div', 'form-row');
+      const labText = el('label', null, '<span>流水文本（每行一笔，格式见 docs/IMPORT.md）</span>');
+      const textarea = el('textarea');
+      textarea.rows = 6;
+      textarea.style.width = '100%';
+      textarea.placeholder = '1 2025-01-15 12:00:00 跨行汇款 C 15000.00 35000.00 40000560091003 示例科技有限公司 工资';
+      labText.appendChild(textarea);
+      textRow.appendChild(labText);
+      textRow.hidden = true;
+      box.appendChild(textRow);
+
+      mode.addEventListener('change', () => {
+        const isPdf = mode.value === 'pdf';
+        fileRow.hidden = !isPdf;
+        textRow.hidden = isPdf;
+      });
+
+      const actionRow = el('div', 'form-row');
+      const btnParse = el('button', 'btn btn-primary', '🔍 解析并预览');
+      btnParse.type = 'button';
+      const btnApply = el('button', 'btn btn-primary', '✅ 应用到分析页');
+      btnApply.type = 'button';
+      btnApply.hidden = true;
+      const btnClear = el('button', 'btn btn-danger', '🗑 删除已导入流水');
+      btnClear.type = 'button';
+      actionRow.append(btnParse, btnApply, btnClear);
+      box.appendChild(actionRow);
+
+      const preview = el('div', 'import-preview');
+      box.appendChild(preview);
+
+      currentRules().then((rules) => fillRulesHint(box, rules));
+
+      btnParse.addEventListener('click', async () => {
+        statusIn(mount, '', '解析中…');
+        preview.textContent = '';
+        btnApply.hidden = true;
+        pending = null;
+
+        let text = '';
+        try {
+          if (mode.value === 'pdf') {
+            const f = file.files?.[0];
+            if (!f) { alert('请先选择流水 PDF 文件。'); statusIn(mount, '', ''); return; }
+            text = await extractPdfText(f); // loadPdfJs 失败会抛错（需联网取组件）
+          } else {
+            text = textarea.value;
+          }
+        } catch (e) {
+          statusIn(mount, '', '');
+          alert('解析失败：' + (e?.message ?? e) + '\n下一步：改用「粘贴文本」方式导入，或确认网络可访问 CDN 后重试。');
+          return;
+        }
+
+        const rules = await currentRules();
+        const { txns, failed } = parseLines(text, FORMATS);
+        if (!txns.length) {
+          statusIn(mount, 'danger', `解析出 0 笔交易（未识别行 ${failed.length} 条）。`);
+          alert(
+            '没有解析出任何交易。\n' +
+            '原因：文本与内置格式（交通银行 · 个人客户交易清单）不匹配，或 PDF 是扫描件（文字不可复制）。\n' +
+            '下一步：打开流水 PDF 全选复制文本，切到「粘贴文本」粘贴后重试；行格式样例见 docs/IMPORT.md。',
+          );
+          return;
+        }
+
+        const classified = classify(txns, rules);
+        const agg = aggregate(classified);
+        pending = { txns: classified, failed, rules };
+
+        const cats = {};
+        for (const t of classified) cats[t.cat] = (cats[t.cat] ?? 0) + 1;
+        const dates = classified.map((t) => t.d).sort();
+        const lastBal = classified.filter((t) => Number.isFinite(t.bal)).at(-1)?.bal;
+        const inflow = classified.filter((t) => t.dc === 'C').reduce((s, t) => s + t.amt, 0);
+        const outflow = classified.filter((t) => t.dc === 'D').reduce((s, t) => s + t.amt, 0);
+        const catLabel = { salary: '工资', bonus: '奖金', subsidy: '补贴', bigExpense: '大额支出', skip: '跳过(内部转账)', other: '其他' };
+
+        statusIn(mount, 'ok', `解析成功：${classified.length} 笔交易，${failed.length} 行未识别。请核对预览后点「✅ 应用到分析页」。`);
+        const wrap = el('div', 'table-wrap');
+        const table = el('table', 'data-table');
+        table.innerHTML =
+          '<thead><tr><th colspan="2">解析预览</th></tr></thead><tbody>' +
+          `<tr><td>交易笔数</td><td class="num">${classified.length}</td></tr>` +
+          `<tr><td>统计区间</td><td class="num">${esc(dates[0] ?? '—')} ~ ${esc(dates[dates.length - 1] ?? '—')}</td></tr>` +
+          `<tr><td>流入 / 流出合计</td><td class="num">${fmtMoney(inflow)} / ${fmtMoney(outflow)}</td></tr>` +
+          (lastBal != null ? `<tr><td>最新账户余额</td><td class="num">${fmtMoney(lastBal)}</td></tr>` : '') +
+          Object.entries(cats).map(([k, v]) => `<tr><td>${esc(catLabel[k] ?? k)}</td><td class="num">${v} 笔</td></tr>`).join('') +
+          `<tr><td>未识别行（已忽略）</td><td class="num">${failed.length}</td></tr>` +
+          '</tbody>';
+        wrap.appendChild(table);
+        preview.appendChild(wrap);
+        btnApply.hidden = false;
+      });
+
+      btnApply.addEventListener('click', async () => {
+        if (!pending) return;
+        const count = pending.txns.length;
+        if (!confirm(`确认把 ${count} 笔流水应用到分析页？\n将覆盖之前导入的流水数据（txns 实体）。`)) return;
+        try {
+          // BUG-002/D17 修订：应用前自动建快照（覆盖型写保护），失败需 confirm 才继续
+          await applyImport(pending.txns, pending.rules, { confirmLoss });
+        } catch (e) {
+          alert('已中止应用：' + (e?.message ?? e) + '\n下一步：检查后端/token 后重试（现有数据未被改动）。');
+          return;
+        }
+        pending = null;
+        btnApply.hidden = true;
+        preview.textContent = '';
+        statusIn(mount, 'ok', `已应用 ${count} 笔流水，分析页数据已自动更新。\n建议：到「① 数据包备份」导出备份 JSON 固化本次成果。`);
+      });
+
+      btnClear.addEventListener('click', async () => {
+        if (!confirm('删除已导入的流水数据（txns 实体，D23 墓碑删除）？\n分析页 2.x 将回到空态引导。')) return;
+        await removeEntity('txns');
+        await afterDataChange(mount, '已删除导入流水（墓碑），分析页 2.x 已回到空态引导。');
+      });
+    }
+
+    async function fillRulesHint(box, rules) {
+      const old = box.querySelector('.rules-hint');
+      if (old) old.remove();
+      const p = el('p', 'rules-hint hint');
+      p.textContent =
+        `当前分类规则：雇主关键词 [${(rules.employer ?? []).join('、') || '无'}] · 工资摘要「${rules.salaryAbstract ?? '工资'}」 · ` +
+        `奖金下限 ${rules.bonusMin ?? '—'} · 大额支出阈值 ${rules.bigExpenseMin ?? '—'}（在「③ 收入口径」可调）。`;
+      box.appendChild(p);
+    }
+
+    /** 生效分类规则：txns 实体内的 rules 优先，否则 DATA.meta.importer */
+    async function currentRules() {
+      const data = getCurrentData();
+      try {
+        const rec = await kvGet('txns');
+        if (rec && !rec.deleted && rec.value?.rules) return rec.value.rules;
+      } catch { /* 忽略 */ }
+      return data?.meta?.importer ?? {};
+    }
+
+    /* ------------------------------- ③ 收入口径 ------------------------------- */
+
+    async function buildIncome(mount) {
+      const box = contentOf(mount);
+      box.textContent = '';
+      const data = getCurrentData();
+      let spend = '';
+      try {
+        spend = (await kvGet('settings'))?.value?.spend ?? '';
+      } catch { /* 忽略 */ }
+      const rules = data?.meta?.importer ?? {};
+
+      box.appendChild(el('h4', null, '月支出口径'));
+      box.appendChild(el('p', 'hint', '健康度「应急覆盖」等按此口径计算；仅存本机 settings 实体。'));
+      const spendRow = el('div', 'form-row');
+      const labSpend = el('label', null, '<span>月支出（元/月）</span>');
+      const spendInput = el('input');
+      spendInput.type = 'number';
+      spendInput.min = '0';
+      spendInput.step = '100';
+      spendInput.placeholder = '如 6000';
+      if (spend !== '') spendInput.value = String(spend);
+      labSpend.appendChild(spendInput);
+      const btnSpend = el('button', 'btn btn-primary', '保存月支出');
+      btnSpend.type = 'button';
+      btnSpend.addEventListener('click', async () => {
+        const v = Number(spendInput.value);
+        if (!Number.isFinite(v) || v < 0) { alert('月支出请填写不小于 0 的数字。'); return; }
+        await commitChange('settings', { spend: v }); // BUG-004①：先 await commitChange
+        flushOutbox().catch(() => { /* 离线：留待 online/立即同步 */ }); // 再 flush
+        statusIn(mount, 'ok', `月支出口径已保存：${fmtMoney(v)} 元/月。`);
+      });
+      spendRow.append(labSpend, btnSpend);
+      box.appendChild(spendRow);
+
+      box.appendChild(el('h4', null, '流水分类规则（importer）'));
+      box.appendChild(el('p', 'hint', '数组类填逗号分隔；保存后写入账本主数据（DATA.meta.importer），下次解析与 2.x 重算生效。'));
+      const mkField = (labelText, val, type = 'text') => {
+        const lab = el('label', null, `<span>${labelText}</span>`);
+        const input = el('input');
+        input.type = type;
+        if (type === 'number') { input.min = '0'; input.step = '100'; }
+        input.value = val == null ? '' : String(val);
+        lab.appendChild(input);
+        return { lab, input };
+      };
+      const fEmployer = mkField('雇主户名关键词（逗号分隔）', (rules.employer ?? []).join('，'));
+      const fSalary = mkField('工资摘要关键词', rules.salaryAbstract ?? '工资');
+      const fSubsidy = mkField('补贴摘要关键词（逗号分隔）', (rules.subsidyKeywords ?? []).join('，'));
+      const fSkip = mkField('排除的交易类型（逗号分隔）', (rules.skipTypes ?? []).join('，'));
+      const fBonus = mkField('奖金下限（元，≥ 判为奖金）', rules.bonusMin, 'number');
+      const fBig = mkField('大额支出阈值（元，≥ 判定）', rules.bigExpenseMin, 'number');
+      const ruleRow = el('div', 'form-row');
+      ruleRow.append(fEmployer.lab, fSalary.lab, fSubsidy.lab);
+      const ruleRow2 = el('div', 'form-row');
+      ruleRow2.append(fSkip.lab, fBonus.lab, fBig.lab);
+      const btnRules = el('button', 'btn btn-primary', '保存分类规则');
+      btnRules.type = 'button';
+      ruleRow2.appendChild(btnRules);
+      box.append(ruleRow, ruleRow2);
+
+      btnRules.addEventListener('click', async () => {
+        const next = {
+          employer: splitList(fEmployer.input.value),
+          salaryAbstract: fSalary.input.value.trim() || '工资',
+          subsidyKeywords: splitList(fSubsidy.input.value),
+          skipTypes: splitList(fSkip.input.value),
+          bonusMin: fBonus.input.value === '' ? undefined : Number(fBonus.input.value),
+          bigExpenseMin: fBig.input.value === '' ? undefined : Number(fBig.input.value),
+        };
+        // O-2：规则为空时 confirm 提示，防误存空规则
+        const emptyRules =
+          !next.employer.length && !next.subsidyKeywords.length && !next.skipTypes.length &&
+          next.bonusMin == null && next.bigExpenseMin == null;
+        if (emptyRules && !confirm('分类规则为空：所有入账将归为「其他」、支出不判大额。\n确认保存空规则？')) return;
+        const cur = getCurrentData();
+        if (!cur) { alert('账本数据尚未就绪，请稍后重试。'); return; }
+        const newData = JSON.parse(JSON.stringify(cur));
+        newData.meta = newData.meta ?? {};
+        newData.meta.importer = next;
+        await commitChange('data', newData); // BUG-004①：先 await commitChange
+        // 已导入流水随新规则重分类（保持 txns.rules 与账本口径一致）
+        try {
+          const rec = await kvGet('txns');
+          if (rec && !rec.deleted && Array.isArray(rec.value?.txns)) {
+            await commitChange('txns', { rules: next, txns: rec.value.txns });
+          }
+        } catch { /* 忽略 */ }
+        await afterDataChange(mount, '分类规则已保存（账本主数据 + 已导入流水的规则同步更新）。');
+      });
+    }
+
+    /* ----------------------------- ④ 同步与连接 ----------------------------- */
+
+    async function buildSync(mount) {
+      const box = contentOf(mount);
+      box.textContent = '';
+      box.appendChild(el('p', 'hint', '同步仅在自建后端与本机之间进行；不配置 token 也可纯本机使用（IndexedDB）。'));
+
+      const tokenRow = el('div', 'form-row');
+      const labToken = el('label', null, '<span>API Token（backend/data/token.txt）</span>');
+      const tokenInput = el('input');
+      tokenInput.type = 'password';
+      tokenInput.placeholder = '32 位 hex';
+      tokenInput.autocomplete = 'off';
+      labToken.appendChild(tokenInput);
+      const btnSave = el('button', 'btn btn-primary', '保存 token');
+      btnSave.type = 'button';
+      const btnClear = el('button', 'btn', '清除');
+      btnClear.type = 'button';
+      tokenRow.append(labToken, btnSave, btnClear);
+      box.appendChild(tokenRow);
+
+      const info = el('p', 'hint');
+      box.appendChild(info);
+
+      const syncRow = el('div', 'form-row');
+      const btnSync = el('button', 'btn btn-primary', '🔄 立即同步');
+      btnSync.type = 'button';
+      syncRow.appendChild(btnSync);
+      box.appendChild(syncRow);
+
+      async function refreshInfo() {
+        const token = getAuthToken();
+        tokenInput.placeholder = token ? `已设置（${token.length} 位，输入新值可更换）` : '32 位 hex';
+        let lastSync = null;
+        let deviceId = '';
+        try {
+          lastSync = await metaGet('lastSync');
+          deviceId = await getDeviceId();
+        } catch { /* 忽略 */ }
+        info.textContent =
+          `token：${token ? '已设置 ✓' : '未设置（/api/* 将 401）'} · ` +
+          `上次同步：${lastSync ? new Date(lastSync).toLocaleString('zh-CN') : '从未'} · ` +
+          `本机 deviceId：${deviceId ? deviceId.slice(0, 8) + '…' : '—'}`;
+      }
+      btnSave.addEventListener('click', () => {
+        const v = tokenInput.value.trim();
+        if (v && !/^[0-9a-fA-F]{32}$/.test(v)) {
+          alert('token 应为 32 位 hex（见 backend/data/token.txt）。');
+          return;
+        }
+        setAuthToken(v);
+        tokenInput.value = '';
+        refreshInfo();
+        statusIn(mount, 'ok', v ? 'token 已保存。' : 'token 已清除。');
+        void refreshSnapshotList?.(); // BUG-009：token 变更后快照面板即时重建（空值=清除 → 不可用态）
+      });
+      btnClear.addEventListener('click', () => {
+        setAuthToken('');
+        refreshInfo();
+        statusIn(mount, '', 'token 已清除。');
+        void refreshSnapshotList?.(); // BUG-009：清除后快照面板即时切「不可用（缺少 token）」态，不滞留旧列表
+      });
+      btnSync.addEventListener('click', async () => {
+        statusIn(mount, '', '同步中…');
+        try {
+          const pushed = await flushOutbox();
+          const pulled = await pullState();
+          await refreshInfo();
+          // BUG-010：计数与「本页数据已刷新」合并为一条最终文案。不再先写计数又被
+          // afterDataChange 的通用文案瞬时覆盖——rerender 重建面板后一次写入并停留。
+          await afterDataChange(
+            mount,
+            `同步完成：推送 ${pushed.pushed} 项（服务端较新覆盖 ${pushed.serverNewer}），` +
+            `拉取应用 ${pulled.applied.length} 项；本页数据已刷新。`,
+          );
+        } catch (e) {
+          await refreshInfo();
+          statusIn(mount, '', '');
+          alert('同步失败：' + (e?.message ?? e) + '\n下一步：确认后端已启动（python backend/app.py）、token 正确、网络可达。离线时数据仍安全保存在本机。');
+        }
+      });
+      refreshInfo();
+    }
+
+    /* --------------------------------- 装配（O-2 时序） --------------------------------- */
+
+    const MOUNTS = { backup: $('backup-mount'), importer: $('importer-mount'), income: $('income-mount'), sync: $('sync-mount') };
+
+    /**
+     * O-2：面板一律在「数据装载完成」（core 'chijia:rendered'）之后构建，
+     * 修复 boot 时序空预填；BUG-005：sync/pulled/imported/data-changed 事件
+     * 统一走重建，月支出回显/快照列表/分类规则/lastSync 随之刷新（D27）。
+     */
+    function buildAllPanels() {
+      buildBackup(MOUNTS.backup);
+      buildImporter(MOUNTS.importer);
+      buildIncome(MOUNTS.income);
+      buildSync(MOUNTS.sync);
+    }
+    addEventListener('chijia:rendered', (e) => {
+      if (e.detail?.pageMode === 'settings') buildAllPanels();
+    });
+    addEventListener('chijia:pulled', () => rerender()); // 先刷新 core 数据缓存，再经 rendered 重建面板
+    addEventListener('chijia:sync', () => buildSync(MOUNTS.sync)); // online 补发后刷新 lastSync 状态
+    try {
+      bc.addEventListener('message', (e) => {
+        if (e.data?.type === 'data-changed' || e.data?.type === 'imported') rerender(); // → rendered → 重建
+      });
+    } catch { /* 忽略 */ }
+
+    /* ----------------------- BUG-008：直达滚动就绪辅助 ----------------------- */
+
+    /** 本页是否已完成首次渲染（chijia:rendered 由 core boot/rerender 广播） */
+    let _pageRendered = false;
+    addEventListener('chijia:rendered', () => { _pageRendered = true; });
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    /** 落位容差（UX-SPEC 流程①回归口径：终态 |panelTop| ≤ 24px 即算到位） */
+    const FOCUS_TOLERANCE_PX = 24;
+    const offTarget = (target) => Math.abs(target.getBoundingClientRect().top) > FOCUS_TOLERANCE_PX;
+
+    /** smooth 是否仍在途且朝目标改善（120ms 双采样；改善中不打断，保住 smooth 观感） */
+    async function scrollImproving(target) {
+      const before = target.getBoundingClientRect().top;
+      await sleep(120);
+      return Math.abs(target.getBoundingClientRect().top) < Math.abs(before) - 1;
+    }
+
+    /**
+     * BUG-008 v3（二次返工·偏差收敛制）：慢渲染环境根因——首滚与早期修正发生在
+     * 骨架期（文档矮、maxScroll 仅 ~79px），面板装配与内容随后完成、布局长高，
+     * 面板被推远而固定轮次已耗尽（QA 实测终态 79/202 的根因）。故：
+     *   - 检查点 ≈0.3/1/2.5/4/6s + 每次 chijia:rendered 插检（慢渲染完成/热更新广播）；
+     *   - |top| > 24 即不达标：smooth 在途改善中不打断（保观感），否则 instant 滚；
+     *   - 连续两次达标才收口；8s 硬上限，退出前仍不达标强制修正一次；
+     *   - 每次检查/修正输出时间线（t/scrollY/panelTop/docHeight/轮次）供复验核对。
+     */
+    async function focusWithRetries(panel) {
+      const t0 = performance.now();
+      const log = (round, note) =>
+        console.log(`[chijia] 直达滚动 #${round} t=${Math.round(performance.now() - t0)}ms scrollY=${Math.round(scrollY)} panelTop=${Math.round(panel.getBoundingClientRect().top)} docHeight=${Math.round(document.documentElement.scrollHeight)} ${note}`);
+
+      let pokeResolve = null;
+      let poked = false;
+      const poke = () => {
+        poked = true;
+        if (pokeResolve) { const r = pokeResolve; pokeResolve = null; r(); }
+      };
+      addEventListener('chijia:rendered', poke);
+      try {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); // 首滚：人类观感
+        log(0, 'first-smooth');
+        let okStreak = 0;
+        let round = 0;
+        const waits = [300, 700, 1500, 1500, 2000]; // 累计 ≈0.3/1/2.5/4/6s；其后 1s 步进至 8s 上限
+        while (performance.now() - t0 < 8000) {
+          const wait = poked ? 50 : (waits[round] ?? 1000); // rendered 插检：50ms 内快查
+          poked = false;
+          await Promise.race([
+            sleep(wait),
+            new Promise((res) => { pokeResolve = res; }),
+          ]);
+          round += 1;
+          if (!offTarget(panel)) {
+            okStreak += 1;
+            log(round, `ok(${okStreak}/2)`);
+            if (okStreak >= 2) return; // 连续两次达标 → 收口
+            continue;
+          }
+          okStreak = 0;
+          if (await scrollImproving(panel)) { log(round, 'smooth-in-flight, skip'); continue; }
+          panel.scrollIntoView({ behavior: 'auto', block: 'start' }); // instant 修正
+          log(round, 'instant-fix');
+        }
+        if (offTarget(panel)) {
+          panel.scrollIntoView({ behavior: 'auto', block: 'start' }); // 8s 硬上限强制落位
+          log('final', 'force-fix');
+        }
+      } finally {
+        removeEventListener('chijia:rendered', poke);
+      }
+    }
+
+    /** 首载路径：等首次渲染（3s 兜底）再滚；已渲染路径（二次直达/hash 直开）：立即执行 */
+    function scrollToPanelWhenReady(panel) {
+      panel.open = true; // 展开不等渲染：点按即有可见反馈（UX-SPEC §3）
+      if (_pageRendered) {
+        void focusWithRetries(panel);
+        return;
+      }
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        void focusWithRetries(panel); // 首滚 smooth 在此发起；instant 校正见上
+      };
+      addEventListener('chijia:rendered', run, { once: true });
+      setTimeout(run, 3000); // 渲染事件异常缺失时兜底，保证最终必滚
+    }
+
+    // 壳「📥 去导入流水」直达钩子（UX-SPEC 流程①：导入面板默认展开且可见）
+    window.__chijia = {
+      focusImporter() {
+        const panel = $('panel-import');
+        if (!panel) return;
+        scrollToPanelWhenReady(panel); // BUG-008：首载等渲染就绪再滚（plan 页 focusParams 同法）
+      },
+    };
+
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

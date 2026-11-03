@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <title>持家 · 计划</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body data-page="plan">
+
+  <header class="page-head">
+    <h1>📋 计划</h1>
+    <p class="page-sub">计划推演与预期：Hero（现在/预期）+ 资金分布对照 + ④参数面板 + 1.1~1.4 + 1.5保护规则</p>
+  </header>
+
+  <main class="page">
+    <!-- Hero（现在 / 计划期末，中间箭头自动生成） -->
+    <section id="hero-mount" aria-label="现在与计划期末">
+      <p class="empty">账本数据就绪后，此处显示「现在 → 计划期末」指标对照。</p>
+    </section>
+
+    <!-- 资金分布 & 计划总览 -->
+    <section id="overview-mount" aria-label="资金分布与计划总览">
+      <p class="empty">账本数据就绪后，此处显示资金分布堆叠条与计划对照表。</p>
+    </section>
+
+    <!-- ④ 参数面板（首页「去调参数」直达：自动展开并滚动到位） -->
+    <details class="panel" id="plan-panel">
+      <summary>④ 参数面板</summary>
+      <div class="panel-body" id="plan-panel-mount">
+        <p class="empty">在此调整月收入/四池分配/收益率/年数，点「按参数重算」后 1.1~1.4 与预期分布自动更新。</p>
+      </div>
+    </details>
+
+    <!-- 发送到计算器（UX-SPEC 流程③：FFC_PREFILL 预填，30 分钟有效） -->
+    <div class="quick-actions">
+      <button class="btn" id="send-to-calc" type="button">🧮 发送到计算器</button>
+      <span class="hint" id="send-hint">把当前月可支配收入/消费池/期初本金预填到计算器（30 分钟内有效）。</span>
+    </div>
+
+    <!-- 1.1 ~ 1.4 章节 + 1.5 保护规则（rules 双栏由 renderParts 生成） -->
+    <section id="parts-mount" aria-label="计划章节">
+      <p class="empty">账本数据就绪后，此处显示四池分配、结余推演、期末预期与里程碑。</p>
+    </section>
+  </main>
+
+  <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
+
+  <script type="module">
+    import {
+      boot, rerender, renderHero, renderOverview, renderParts,
+      buildPlanBlocks, getCurrentData, fmtInt,
+    } from './src/core.js';
+
+    boot('plan');
+
+    /**
+     * 参数重算联动（UX-SPEC 流程②）：
+     * 1.1~1.4 由 buildPlanBlocks(plan) 重新生成并全部展开；
+     * Hero 计划期末（估）与总览期末合计同步更新为推演结果。
+     */
+    function updatePlanViews(plan, res) {
+      const data = getCurrentData();
+      if (!data) return;
+      const part1 = (data.parts ?? []).find((p) => p.no === '1' || p.id === 'plan');
+
+      // 1.1 ~ 1.4 重新生成 + 自动展开；1.5 保护规则双栏保持 DATA 原样
+      if (part1) {
+        const sections = buildPlanBlocks(plan, 0);
+        renderParts(
+          document.getElementById('parts-mount'),
+          [{ ...part1, sections }],
+          { defaultCollapsed: false }, // 重算后自动展开
+        );
+      }
+
+      // Hero（计划期末「估」项更新为推演值）
+      if (data.hero?.exp) {
+        const hero = structuredClone(data.hero);
+        for (const it of hero.exp.items ?? []) {
+          const lab = String(it.label ?? '');
+          if (lab.includes('金融资产')) it.b = '≈' + fmtInt(res.endFinance);
+          else if (lab.includes('净资产')) it.b = '≈' + fmtInt(res.endNet);
+        }
+        renderHero(document.getElementById('hero-mount'), hero);
+      }
+
+      // 总览（计划期末合计与金融资产行同步推演值；构成比例保持账本口径）
+      if (data.overview?.exp) {
+        const ov = structuredClone(data.overview);
+        ov.exp.total = '≈' + fmtInt(res.endNet);
+        const financeRow = (ov.exp.rows ?? []).find((r) => String(r.name ?? '').includes('基金'));
+        if (financeRow) {
+          financeRow.amt = '≈' + fmtInt(res.endFinance);
+          const net = Math.max(1, res.endNet);
+          financeRow.pc = Math.round((res.endFinance / net) * 100) + '%';
+        }
+        renderOverview(document.getElementById('overview-mount'), ov);
+      }
+    }
+
+    // boot 参数面板 onChange / 启动恢复已存参数 时广播（detail: {plan, res}）
+    addEventListener('chijia:planrecalc', (e) => {
+      const { plan, res } = e.detail ?? {};
+      if (plan && res) updatePlanViews(plan, res);
+    });
+
+    // 设置页改动数据包/口径后广播，本页热更新
+    let bc;
+    try {
+      bc = new BroadcastChannel('chijia');
+      bc.addEventListener('message', (e) => {
+        if (e.data?.type === 'data-changed') rerender();
+      });
+    } catch { /* 无 BroadcastChannel 环境 */ }
+
+    /** 最近一次重算的参数缓存（planrecalc 事件在首渲染即广播，故始终有值） */
+    let lastPlan = null;
+    addEventListener('chijia:planrecalc', (e) => {
+      lastPlan = e.detail?.plan ?? lastPlan;
+    });
+
+    // UX-SPEC 流程③：FFC_PREFILL 预填（30 分钟有效），计算器页负责消费
+    document.getElementById('send-to-calc')?.addEventListener('click', () => {
+      const data = getCurrentData();
+      const cur = lastPlan ?? { income: 10500, consume: 6000, base: 0 };
+      try {
+        localStorage.setItem('FFC_PREFILL', JSON.stringify({
+          ts: Date.now(),
+          label: data?.meta?.calculator?.label ?? '来自计划页',
+          fields: { income: cur.income, spend: cur.consume, base: cur.base },
+        }));
+      } catch { /* 隐私模式：预填不可用，计算器仍可手填 */ }
+      const hint = document.getElementById('send-hint');
+      if (hint) hint.textContent = '已发送 ✓ 计算器将在打开时自动填入（30 分钟内有效）。';
+      window.open((data?.meta?.calculator?.file ?? './calculator.html'), '_blank');
+    });
+
+    /* ----------------------- BUG-008：直达滚动就绪辅助 ----------------------- */
+
+    /** 本页是否已完成首次渲染（chijia:rendered 由 core boot/rerender 广播） */
+    let _pageRendered = false;
+    addEventListener('chijia:rendered', () => { _pageRendered = true; });
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    /** 落位容差（UX-SPEC 流程②回归口径：终态 |panelTop| ≤ 24px 即算到位） */
+    const FOCUS_TOLERANCE_PX = 24;
+    const offTarget = (target) => Math.abs(target.getBoundingClientRect().top) > FOCUS_TOLERANCE_PX;
+
+    /** smooth 是否仍在途且朝目标改善（120ms 双采样；改善中不打断，保住 smooth 观感） */
+    async function scrollImproving(target) {
+      const before = target.getBoundingClientRect().top;
+      await sleep(120);
+      return Math.abs(target.getBoundingClientRect().top) < Math.abs(before) - 1;
+    }
+
+    /**
+     * BUG-008 v3（二次返工·偏差收敛制）：慢渲染环境根因——首滚与早期修正发生在
+     * 骨架期（文档矮、maxScroll 仅 ~79px），1.1~1.4 章节随后展开、布局长高，面板
+     * 被推远而固定轮次已耗尽（QA 实测终态 79/202 与 v1 卡死值一致的根因）。故：
+     *   - 检查点 ≈0.3/1/2.5/4/6s + 每次 chijia:rendered 插检（慢渲染完成/热更新广播）；
+     *   - |top| > 24 即不达标：smooth 在途改善中不打断（保观感），否则 instant 滚；
+     *   - 连续两次达标才收口；8s 硬上限，退出前仍不达标强制修正一次；
+     *   - 每次检查/修正输出时间线（t/scrollY/panelTop/docHeight/轮次）供复验核对。
+     */
+    async function focusWithRetries(panel) {
+      const t0 = performance.now();
+      const log = (round, note) =>
+        console.log(`[chijia] 直达滚动 #${round} t=${Math.round(performance.now() - t0)}ms scrollY=${Math.round(scrollY)} panelTop=${Math.round(panel.getBoundingClientRect().top)} docHeight=${Math.round(document.documentElement.scrollHeight)} ${note}`);
+
+      let pokeResolve = null;
+      let poked = false;
+      const poke = () => {
+        poked = true;
+        if (pokeResolve) { const r = pokeResolve; pokeResolve = null; r(); }
+      };
+      addEventListener('chijia:rendered', poke);
+      try {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); // 首滚：人类观感
+        log(0, 'first-smooth');
+        let okStreak = 0;
+        let round = 0;
+        const waits = [300, 700, 1500, 1500, 2000]; // 累计 ≈0.3/1/2.5/4/6s；其后 1s 步进至 8s 上限
+        while (performance.now() - t0 < 8000) {
+          const wait = poked ? 50 : (waits[round] ?? 1000); // rendered 插检：50ms 内快查
+          poked = false;
+          await Promise.race([
+            sleep(wait),
+            new Promise((res) => { pokeResolve = res; }),
+          ]);
+          round += 1;
+          if (!offTarget(panel)) {
+            okStreak += 1;
+            log(round, `ok(${okStreak}/2)`);
+            if (okStreak >= 2) return; // 连续两次达标 → 收口
+            continue;
+          }
+          okStreak = 0;
+          if (await scrollImproving(panel)) { log(round, 'smooth-in-flight, skip'); continue; }
+          panel.scrollIntoView({ behavior: 'auto', block: 'start' }); // instant 修正
+          log(round, 'instant-fix');
+        }
+        if (offTarget(panel)) {
+          panel.scrollIntoView({ behavior: 'auto', block: 'start' }); // 8s 硬上限强制落位
+          log('final', 'force-fix');
+        }
+      } finally {
+        removeEventListener('chijia:rendered', poke);
+      }
+    }
+
+    /** 首载路径：等首次渲染（3s 兜底）再滚；已渲染路径（二次直达/hash 直开）：立即执行 */
+    function scrollToPanelWhenReady(panel) {
+      panel.open = true; // 展开不等渲染：点按即有可见反馈（UX-SPEC §3）
+      if (_pageRendered) {
+        void focusWithRetries(panel);
+        return;
+      }
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        void focusWithRetries(panel); // 首滚 smooth 在此发起；instant 校正见上
+      };
+      addEventListener('chijia:rendered', run, { once: true });
+      setTimeout(run, 3000); // 渲染事件异常缺失时兜底，保证最终必滚
+    }
+
+    // 壳「🎛 去调参数」直达钩子（UX-SPEC 流程②：参数面板自动展开并滚动到位）
+    window.__chijia = {
+      focusParams() {
+        const panel = document.getElementById('plan-panel');
+        if (!panel) return;
+        scrollToPanelWhenReady(panel); // BUG-008：首载等渲染就绪再滚（settings 页 focusImporter 同法）
+      },
+    };
+
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

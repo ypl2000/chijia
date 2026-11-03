@@ -1,0 +1,21 @@
+{
+  "name": "持家 chijia",
+  "short_name": "持家",
+  "description": "个人财务「持家」双端应用：账本、计划推演、流水分析、FIRE 计算器与组合体检。数据仅存本机。",
+  "version": "2.0.2",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f7fb",
+  "theme_color": "#2f6bff",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

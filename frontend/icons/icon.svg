@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="28" fill="#2f6bff"/>
+  <path d="M64 24 26 56h10v44a4 4 0 0 0 4 4h48a4 4 0 0 0 4-4V56h10L64 24z" fill="#ffffff"/>
+  <text x="64" y="90" font-size="40" text-anchor="middle" fill="#2f6bff" font-family="'Microsoft YaHei','PingFang SC',sans-serif" font-weight="bold">家</text>
+</svg>

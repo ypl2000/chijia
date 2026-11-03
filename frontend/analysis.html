@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2f6bff">
+  <title>持家 · 分析</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
+</head>
+<body data-page="analysis">
+
+  <header class="page-head">
+    <h1>🔎 分析</h1>
+    <p class="page-sub">流水统计与健康度：统计维度芯片 + 2.1~2.5 流水分析 + 3.1~3.4 健康度评估</p>
+  </header>
+
+  <main class="page">
+    <!-- 统计维度芯片（DATA.meta.statsDim；导入流水后显示实测口径） -->
+    <section id="stats-dim-mount" aria-label="统计维度">
+      <p class="empty">导入流水后，此处显示统计维度（笔数与时间跨度）。</p>
+    </section>
+
+    <!-- 2.1 ~ 2.5 流水分析 + 3.1 ~ 3.4 健康度（各节默认折叠，打印时全部展开） -->
+    <section id="parts-mount" aria-label="分析与健康度章节">
+      <p class="empty">尚未导入流水——前往「设置」导入 PDF 或粘贴文本后，2.x 自动更新；3.x 基于账本数据生成。</p>
+    </section>
+  </main>
+
+  <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
+
+  <script type="module">
+    import { boot, rerender } from './src/core.js';
+
+    boot('analysis');
+
+    /**
+     * 导入应用后自动更新（UX-SPEC 流程①第 3 步）：
+     * - applyImport 广播 window CustomEvent 'chijia:imported'（同页场景）
+     * - 并经 BroadcastChannel 'chijia' 通知其他 iframe（跨页场景）
+     * - 设置页数据包/口径变更广播 {type:'data-changed'} 同样触发重渲染
+     */
+    let bc;
+    try {
+      bc = new BroadcastChannel('chijia');
+      bc.addEventListener('message', (e) => {
+        if (e.data?.type === 'imported' || e.data?.type === 'data-changed') rerender();
+      });
+    } catch { /* 无 BroadcastChannel 环境 */ }
+    addEventListener('chijia:imported', () => rerender());
+
+    // 壳「🔎 去分析」直达仅需切换 Tab；保留刷新扩展位
+    window.__chijia = {
+      refresh() { rerender(); },
+    };
+
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
