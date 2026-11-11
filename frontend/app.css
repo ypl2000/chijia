@@ -1,5 +1,5 @@
 /* ============================================================
-   持家 chijia v2.0.2 · app.css
+   持家 chijia v2.0.7 · app.css
    设计 token + 深浅双主题 + 壳与页面排版 + DATA.md 全部 block
    类型样式 + 移动端 390 密度 + 打印（折叠全部展开）。
    引用方式：<link rel="stylesheet" href="app.css?v=版本">
@@ -156,7 +156,7 @@ code {
 
 .hint {
   color: var(--c-text-muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：提示性小字 13px→12px（次级色不变，正文/数值字号不动） */
   font-weight: normal;
 }
 .muted {
@@ -171,6 +171,11 @@ code {
 .num {
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+/* 问题⑨：估算前缀（≈/=）等宽透明占位——前缀字符不再渲染，占位保持数值列位置不位移（无色，深浅主题无差异） */
+.est-pad {
+  display: inline-block;
+  width: 1.2em;
 }
 
 /* ------------------------------ 壳：顶栏与舞台 ------------------------------ */
@@ -261,7 +266,7 @@ code {
 .page-head .page-sub {
   margin: 0;
   color: var(--c-text-muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：说明性小字下调一号 */
 }
 .page-footer {
   max-width: 960px;
@@ -390,6 +395,22 @@ input[type='file']::file-selector-button {
   font-size: var(--fs-sm);
   color: var(--c-text-muted);
 }
+/* 改动⑥：四步卡片内嵌直达按钮（卡片纵向布局，按钮沉底等高对齐） */
+#home-guide .card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+#home-guide .card h3 {
+  margin: 0;
+}
+#home-guide .card p {
+  margin: 0;
+}
+.card-go {
+  margin-top: auto;
+  width: 100%;
+}
 
 .panel {
   background: var(--c-surface);
@@ -445,7 +466,7 @@ input[type='file']::file-selector-button {
   border: 1px dashed var(--c-border);
   border-radius: var(--radius-md);
   color: var(--c-text-muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：空态引导小字下调一号 */
   text-align: center;
   background: var(--c-surface);
 }
@@ -766,11 +787,32 @@ table.data-table tr.is-muted td {
 .sec-summary {
   font-size: var(--fs-md);
 }
+/* 改动②：平铺小节（2.1 收入构成 / 2.2 支出结构）——面板盒无折叠交互，
+   内容直接可见；无 summary/编号标题，内容自带 h4 小标题充当节标题 */
+.section-flat {
+  margin: var(--sp-3) 0;
+}
+/* 改动③：健康度章节评语醒目化——「x.y 名称：评语」评语段按灯色着色加粗，
+   字号 +2px；灯色用主题 token（绿 --c-ok / 琥珀 --c-warn / 红 --c-danger），
+   深浅主题各自保证对比度（600 weight + 16px 达大文本对比标准） */
+.sec-verdict {
+  font-weight: 600;
+  font-size: calc(var(--fs-md) + 2px);
+}
+.sec-verdict-ok {
+  color: var(--c-ok);
+}
+.sec-verdict-warn {
+  color: var(--c-warn);
+}
+.sec-verdict-danger {
+  color: var(--c-danger);
+}
 
 /* ------------------------------ block：sub / h4 / gap ------------------------------ */
 .block-sub {
   color: var(--c-text-muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：面板内说明小字下调一号 */
   margin: var(--sp-2) 0;
 }
 .block-h4 {
@@ -1051,7 +1093,7 @@ details.details-block > summary {
   padding: 3px 12px;
 }
 .stats-chip-text {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：芯片说明小字下调一号 */
   color: var(--c-text-muted);
 }
 
@@ -1087,6 +1129,30 @@ details.details-block > summary {
 .pp-flash {
   min-height: 1.4em;
 }
+/* T8 参数面板辅助样式：月收入派生说明 / 消费推导展示行 / 安全垫上限提示 */
+.pp-derive-note {
+  margin: var(--sp-2) 0 0;
+}
+.pp-derive {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.pp-derive-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pp-cap-hint {
+  margin: var(--sp-1) 0 var(--sp-2);
+}
 
 /* ------------------------------ 设置页（settings-mode） ------------------------------ */
 body[data-page='settings'] .page {
@@ -1114,7 +1180,7 @@ body[data-page='settings'] .panel > summary {
   flex-direction: column;
   gap: var(--sp-1);
   min-width: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs); /* 改动⑦：面板内字段说明小字下调一号 */
   color: var(--c-text-muted);
 }
 .form-row .btn {
@@ -1187,6 +1253,159 @@ body[data-page='settings'] .panel > summary {
 }
 .status-line:empty {
   display: none;
+}
+
+/* ------------------------------ 体检页 · 截图导入持仓（T7） ------------------------------ */
+/* 全部走主题 token（深浅主题自动适配）；触控目标 ≥44px（UX-SPEC 红线）。 */
+.ocr-upload {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-4);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+.ocr-preview-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.ocr-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.ocr-preview img {
+  max-height: 96px;
+  max-width: 160px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+}
+.ocr-file-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+/* 引擎选择（AI 选项默认隐藏，探测可用才展示）；label 行高 ≥44px 保触控 */
+.ocr-engine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  margin: var(--sp-3) 0;
+}
+.ocr-engine label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.ocr-engine input[type='radio'] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--c-primary);
+}
+/* 候选确认表：首列为 ≥44×44 触控热区；行内输入沿用全局 ≥44px 控件 */
+.ocr-table input[type='text'],
+.ocr-table input[type='number'],
+.ocr-table select {
+  width: 100%;
+  min-width: 96px;
+}
+.ocr-table td {
+  min-width: 96px;
+}
+.ocr-table th:first-child,
+.ocr-table td:first-child {
+  min-width: 44px;
+  width: 44px;
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.ocr-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -6px; /* 扩大点击热区而不撑高行 */
+  cursor: pointer;
+}
+.ocr-check input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--c-primary);
+}
+.ocr-table .ocr-missing {
+  border-color: var(--c-warn);
+}
+.ocr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+.ocr-actions > label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 160px;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+/* 识别原文（rawLines，details 折叠） */
+.ocr-raw {
+  max-height: 160px;
+  overflow: auto;
+  margin: var(--sp-2) 0;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--c-text-muted);
+}
+/* 待识别队列徽标行 */
+.ocr-queue-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ocr-queue-line[hidden] {
+  display: none;
+}
+@media (max-width: 480px) {
+  .ocr-upload {
+    padding: var(--sp-3);
+  }
+  .ocr-preview-wrap .btn {
+    flex: 1 1 100%;
+  }
+  .ocr-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ocr-actions .btn,
+  .ocr-actions > label {
+    width: 100%;
+  }
+  .ocr-queue-line .btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* ------------------------------ 首页原生视图 ------------------------------ */
@@ -1324,5 +1543,235 @@ body[data-page='settings'] .panel > summary {
   * {
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------ 体检页 · 五灯体检引擎（T9） ------------------------------ */
+/* 全部走主题 token（深浅主题自动适配）；触控目标 ≥44px（UX-SPEC 红线）。 */
+.pf-params {
+  margin: var(--sp-3) 0;
+}
+.pf-params .hint {
+  display: block;
+  margin: var(--sp-1) 0 0;
+}
+.pf-params .form-row .btn {
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
+/* 「待确认」徽标（确认表：词典未识别类型的行） */
+.pf-todo {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--c-warn-weak);
+  color: var(--c-warn);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* ESOP 标记（持仓表名称旁） */
+.pf-esop-tag {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--c-esop);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+/* 五灯栅格：每灯 details，可展开判定依据 + 计入明细 */
+.pf-lights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+.pf-light {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  min-width: 0;
+}
+.pf-light[data-tone='ok'] {
+  border-color: var(--c-ok);
+  background: var(--c-ok-weak);
+}
+.pf-light[data-tone='warn'] {
+  border-color: var(--c-warn);
+  background: var(--c-warn-weak);
+}
+.pf-light[data-tone='danger'] {
+  border-color: var(--c-danger);
+  background: var(--c-danger-weak);
+}
+.pf-light[data-tone='none'] {
+  border-style: dashed;
+}
+.pf-light > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pf-light > summary::-webkit-details-marker {
+  display: none;
+}
+.pf-light > summary::after {
+  content: '▸';
+  flex: 0 0 auto;
+  color: var(--c-text-muted);
+}
+.pf-light[open] > summary::after {
+  content: '▾';
+}
+.pf-light .pf-light-emoji {
+  flex: 0 0 auto;
+  font-size: var(--fs-lg);
+}
+.pf-light .pf-light-name {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pf-light .pf-light-key {
+  margin-left: auto;
+  margin-right: var(--sp-1);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf-light .pf-light-key:only-of-type {
+  margin-left: auto;
+}
+.pf-light-body {
+  padding: 0 var(--sp-3) var(--sp-3);
+  font-size: var(--fs-xs);
+}
+.pf-light-basis {
+  margin: 0 0 var(--sp-2);
+  color: var(--c-text-muted);
+  line-height: 1.6;
+}
+/* 计入明细小表：不继承浅色单元格边距，紧凑展示 */
+.pf-light .pf-mini {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.pf-light .pf-mini th,
+.pf-light .pf-mini td {
+  padding: var(--sp-1) var(--sp-2);
+  white-space: nowrap;
+}
+
+/* 持仓编辑器（T9）：类型/权益% 逐条可改 */
+.pf-holdings input[type='number'],
+.pf-holdings select {
+  width: 100%;
+  min-width: 84px;
+}
+.pf-holdings td {
+  vertical-align: middle;
+}
+
+/* 优化建议清单：红灯在前、黄灯在后，左侧色条标识紧迫度 */
+.pf-sugg {
+  list-style: none;
+  margin: var(--sp-3) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.pf-sugg-item {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: var(--fs-sm);
+}
+.pf-sugg-item.is-danger {
+  border-left-color: var(--c-danger);
+}
+.pf-sugg-item.is-warn {
+  border-left-color: var(--c-warn);
+}
+.pf-sugg-head {
+  margin: 0 0 var(--sp-1);
+}
+.pf-sugg-no {
+  color: var(--c-text-muted);
+}
+.pf-sugg-text {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--c-text-muted);
+}
+
+/* 资产构成条（三桶 + 类型分布） */
+.pf-dist-wrap {
+  margin: var(--sp-3) 0;
+}
+.pf-dist {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0;
+}
+.pf-dist-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  min-width: 0;
+}
+.pf-dist-name {
+  flex: 0 0 130px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf-dist-bar {
+  flex: 1 1 auto;
+  min-width: 60px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--c-surface-2);
+  overflow: hidden;
+}
+.pf-dist-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.pf-dist-amt {
+  flex: 0 0 auto;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .pf-lights {
+    grid-template-columns: 1fr;
+  }
+  .pf-light .pf-light-key {
+    max-width: 40%;
+  }
+  .pf-dist-name {
+    flex-basis: 104px;
+  }
+  .pf-holdings th:nth-child(4),
+  .pf-holdings td:nth-child(4) {
+    display: none; /* 390 视口隐藏「占组合」列（灯的明细里都有） */
   }
 }

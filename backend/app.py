@@ -20,21 +20,30 @@
   null 仅表示从未写入。
 - 静态托管：text/html 响应补 Cache-Control: no-cache（D30/BUG-006），JS/CSS 不动。
 - 错误统一 {"error":{"code","message"}}；鉴权失败 401；未知实体 400。
+- 截图识别（T7）：POST /api/portfolio/ocr 本地 RapidOCR 识别（backend/ocr.py，
+  依赖缺失 501 ocr_not_installed）；POST /api/ai/vision 转发智谱视觉模型
+  （config ai.vision.enabled 默认 false → 501 ai_disabled；开启转发 open.bigmodel.cn，
+  上游错误以 502 ai_upstream 透传）。
 """
 
 import argparse
+import base64
 import hmac
 import json
 import re
 import secrets
 import threading
 import time
+import traceback
+import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, File, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
@@ -43,8 +52,10 @@ from starlette.staticfiles import NotModifiedResponse, StaticFiles
 
 try:
     from backend import db  # 以项目根为包根导入（tests 直接 import 时）
+    from backend import ocr
 except ImportError:
     import db  # python backend/app.py 脚本直跑
+    import ocr
 
 # ---------------------------------------------------------------- 路径与运行时常量
 
@@ -56,7 +67,17 @@ DB_PATH = DATA_DIR / "chijia.db"
 TOKEN_PATH = DATA_DIR / "token.txt"
 CONFIG_PATH = DATA_DIR / "config.json"
 
-DEFAULT_CONFIG = {"ai": {"enabled": False}}  # 章程 D7：AI 默认关闭
+# 章程 D7：AI 默认关闭。T7 扩展 vision 段——已有 config.json（缺 vision 字段）不回写，
+# 代码按此处默认值兜底（_vision_config）；仅「首次启动生成」时落完整 schema。
+DEFAULT_CONFIG = {
+    "ai": {
+        "enabled": False,
+        "vision": {"enabled": False, "apiKey": "", "model": "glm-4v-plus"},
+    }
+}
+DEFAULT_VISION_MODEL = "glm-4v-plus"  # config 缺 ai.vision.model 时的兜底
+GLM_CHAT_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 上传图片上限（截图远小于此，防误传大文件）
 RESTORE_DEVICE_ID = "server-restore"  # restore 前向写入使用的 deviceId
 TOKEN_RE = re.compile(r"[0-9a-fA-F]{32}")
 
@@ -91,7 +112,9 @@ def _load_or_create_token() -> str:
 
 
 def _load_or_create_config() -> None:
-    """config.json 缺失时写入默认 {"ai":{"enabled":false}}（章程 D7）。"""
+    """config.json 缺失时写入默认（章程 D7：AI 全关，T7 起含 vision 段）。
+    已存在的 config.json 一律不回写（T7 纪律：用户磁盘配置零改动），
+    新字段（ai.vision.*）由 _vision_config 在读取时按默认值兜底。"""
     if not CONFIG_PATH.exists():
         CONFIG_PATH.write_text(
             json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -110,6 +133,23 @@ def _load_config() -> dict:
 def _ai_enabled() -> bool:
     ai = _load_config().get("ai")
     return isinstance(ai, dict) and ai.get("enabled") is True
+
+
+def _vision_config() -> dict | None:
+    """读取 ai.vision 配置（现读现判，改完即生效）。缺失字段按默认兜底，
+    不回写用户磁盘上的 config.json（T7 纪律）。未启用或缺 apiKey → None（端点 501 ai_disabled）。"""
+    ai = _load_config().get("ai")
+    vision = ai.get("vision") if isinstance(ai, dict) else None
+    if not isinstance(vision, dict) or vision.get("enabled") is not True:
+        return None
+    api_key = vision.get("apiKey")
+    if not isinstance(api_key, str) or not api_key.strip():
+        return None
+    model = vision.get("model")
+    return {
+        "apiKey": api_key.strip(),
+        "model": model if isinstance(model, str) and model.strip() else DEFAULT_VISION_MODEL,
+    }
 
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -432,6 +472,177 @@ def ai_insight():
             "AI 洞察未启用：将 backend/data/config.json 中 ai.enabled 改为 true 即可（请求时现读，即时生效）",
         )
     raise ApiError(501, "not_implemented", "AI 洞察为预留接口，尚未实现")
+
+
+# ---------------------------------------------------------------- 截图识别导入（T7）
+
+_VISION_SYSTEM_PROMPT = (
+    "你是持仓截图识别助手。请从截图中识别每一笔持仓（基金/股票/理财等），"
+    '只输出一个 JSON 对象：{"rows":[{"name":"名称","code":"6位代码（识别不到则省略）",'
+    '"shares":持有份额,"cost":持仓成本,"market":市值或持有金额}]}。'
+    "数字去掉千分位逗号与货币符号；截图里没有的字段省略该键；不要输出 JSON 以外的任何文字。"
+)
+
+
+class _UpstreamError(Exception):
+    """智谱上游错误（message 透传给客户端）。status=None 表示网络层失败。"""
+
+    def __init__(self, status: int | None, message: str):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+async def _read_upload(image: UploadFile | None, file: UploadFile | None) -> bytes:
+    """契约字段 multipart image（兼容 file 别名），读字节并限大小。
+    缺件/空文件 → 400 validation_error；超限 → 413 payload_too_large。"""
+    upload = image or file
+    if upload is None:
+        raise ApiError(400, "validation_error", "请以 multipart/form-data 上传图片（字段名 image）")
+    chunks: list[bytes] = []
+    size = 0
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > MAX_UPLOAD_BYTES:
+            raise ApiError(413, "payload_too_large", f"图片超过 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB 上限")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise ApiError(400, "validation_error", "image 字段为空文件")
+    return data
+
+
+@app.post("/api/portfolio/ocr")
+async def portfolio_ocr(
+    image: UploadFile | None = File(default=None),
+    file: UploadFile | None = File(default=None),
+):
+    """本地截图识别（RapidOCR，数据不出机）。
+    multipart image → {rows:[{name,code?,shares?,cost?,market?}], rawLines:[...]}；
+    识别失败/空 → {rows:[], rawLines:[]}（不 5xx，前端确认表流程兜底）；
+    依赖缺失 → 501 ocr_not_installed。结果仅为候选，确认表人工核对后才写 pf_holdings。"""
+    data = await _read_upload(image, file)
+    try:
+        rows, raw_lines = await run_in_threadpool(ocr.extract, data)
+    except ImportError:
+        raise ApiError(
+            501,
+            "ocr_not_installed",
+            "本地识别组件未安装：pip install rapidocr-onnxruntime python-multipart（装完重启后端生效）",
+        )
+    except Exception:
+        traceback.print_exc()
+        rows, raw_lines = [], []
+    return {"rows": rows, "rawLines": raw_lines}
+
+
+def _call_glm_vision(cfg: dict, image_data: bytes, mime: str) -> str:
+    """转发智谱 GLM 视觉模型（open.bigmodel.cn），返回 assistant 文本。
+    上游 HTTP 错误/网络失败 → _UpstreamError（message 透传）。"""
+    data_url = f"data:{mime};base64," + base64.b64encode(image_data).decode("ascii")
+    body = json.dumps(
+        {
+            "model": cfg["model"],
+            "temperature": 0.1,
+            "messages": [
+                {"role": "system", "content": _VISION_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "text", "text": "识别这张持仓截图，按系统约定只输出 JSON。"},
+                    ],
+                },
+            ],
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        GLM_CHAT_URL,
+        data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {cfg['apiKey']}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            payload = json.loads(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        raise _UpstreamError(e.code, e.read().decode("utf-8", "replace")[:500])
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise _UpstreamError(None, str(e))
+    try:
+        return str(payload["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError):
+        raise _UpstreamError(200, f"响应缺少内容：{json.dumps(payload, ensure_ascii=False)[:300]}")
+
+
+def _parse_vision_rows(content: str) -> list[dict]:
+    """从模型输出提取 {rows:[...]}（容忍 ```json 围栏与前后杂文），归一化字段。"""
+    text = content.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        return []
+    try:
+        parsed = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    rows = parsed.get("rows") if isinstance(parsed, dict) else parsed
+    if not isinstance(rows, list):
+        return []
+    out: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        item: dict = {"name": str(row.get("name", "")).strip()}
+        code = row.get("code")
+        if isinstance(code, (str, int)) and str(code).strip():
+            item["code"] = str(code).strip()
+        for key in ("shares", "cost", "market"):
+            v = row.get(key)
+            if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+                continue
+            try:
+                num = float(str(v).replace(",", "").replace("¥", "").replace("￥", ""))
+            except ValueError:
+                continue
+            item[key] = int(num) if key == "shares" and num.is_integer() else round(num, 4)
+        out.append(item)
+    return out
+
+
+@app.post("/api/ai/vision")
+async def ai_vision(
+    image: UploadFile | None = File(default=None),
+    file: UploadFile | None = File(default=None),
+):
+    """AI 视觉识别（GLM 视觉模型，截图出云至智谱——前端须先弹窗确认再调）。
+    config ai.vision.enabled=false（默认）或缺 apiKey → 501 ai_disabled；
+    上游 HTTP 错误透传为 502 ai_upstream，网络失败 504 ai_upstream_timeout。
+    未启用时前端不展示入口（501 可探测）。"""
+    cfg = _vision_config()
+    if cfg is None:
+        raise ApiError(
+            501,
+            "ai_disabled",
+            'AI 视觉识别未启用：在 backend/data/config.json 设置 '
+            '{"ai":{"vision":{"enabled":true,"apiKey":"你的智谱APIKey","model":"glm-4v-plus"}}}'
+            "（请求时现读，即时生效；注意该功能会将截图发送至智谱云）",
+        )
+    data = await _read_upload(image, file)
+    mime = (image or file).content_type or "image/jpeg"
+    if mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+        mime = "image/jpeg"
+    try:
+        content = await run_in_threadpool(_call_glm_vision, cfg, data, mime)
+    except _UpstreamError as e:
+        if e.status is None:
+            raise ApiError(504, "ai_upstream_timeout", f"智谱 API 连接失败：{e.message}")
+        raise ApiError(502, "ai_upstream", f"智谱 API 返回 {e.status}：{e.message}")
+    return {"rows": _parse_vision_rows(content), "model": cfg["model"]}
 
 
 # ---------------------------------------------------------------- 兜底与静态托管（注册顺序：API → API 兜底 → 静态）

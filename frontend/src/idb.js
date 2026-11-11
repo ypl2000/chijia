@@ -2,25 +2,34 @@
  * 持家 chijia v2 · idb.js
  * IndexedDB 封装（pm/contract.md §3/§4）。
  *
- * 库：`chijia` v1，三个 store：
- *   kv     — 实体整文档记录，keyPath `entity`
- *            记录形如 { entity, value, updatedAt, deviceId, deleted }
- *   outbox — 待同步队列，keyPath `entity`（整实体 LWW，每实体至多一条待发）
- *   meta   — 键值元数据（deviceId、lastSync 等），keyPath `key`
+ * 库：`chijia` v3，四个 store：
+ *   kv          — 实体整文档记录，keyPath `entity`
+ *                 记录形如 { entity, value, updatedAt, deviceId, deleted }
+ *   outbox      — 待同步队列，keyPath `entity`（整实体 LWW，每实体至多一条待发）
+ *   meta        — 键值元数据（deviceId、lastSync 等），keyPath `key`
+ *   pending_ocr — 持仓截图待识别队列（T7），keyPath `id`
+ *                 记录形如 { id, dataUrl, engine, createdAt, attempts, lastError? }；
+ *                 纯本机数据，不参与 /api/sync 同步
  *
  * 协议：变更先写 kv + outbox，再由 sync.js flushOutbox() 尝试 /api/sync；
  * 删除 = deleted:true 墓碑，不物理删行（kv 物理删除只用于本模块内部）。
+ *
+ * 版本迁移（T7：v1/v2 → v3）：升级只「增量补建缺失的 store」，绝不删改既有
+ * store 与数据（IndexedDB 版本升级事务内既有数据原样保留），老 profile 直接平滑升级。
  */
 
 export const DB_NAME = 'chijia';
-export const DB_VERSION = 1;
+export const DB_VERSION = 3;
 
 /** @enum {string} */
 export const STORES = {
   KV: 'kv',
   OUTBOX: 'outbox',
   META: 'meta',
+  PENDING_OCR: 'pending_ocr',
 };
+
+/** @typedef {{id: string, dataUrl: string, engine: 'local'|'ai', createdAt: number, attempts?: number, lastError?: string}} PendingOcrItem */
 
 /** @typedef {{entity: string, value: any, updatedAt: number, deviceId: string, deleted: boolean}} KvRecord */
 
@@ -40,11 +49,24 @@ export function openDB() {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
+        // 增量迁移：只补缺失的 store（老版本数据原样保留）
         if (!db.objectStoreNames.contains(STORES.KV)) db.createObjectStore(STORES.KV, { keyPath: 'entity' });
         if (!db.objectStoreNames.contains(STORES.OUTBOX)) db.createObjectStore(STORES.OUTBOX, { keyPath: 'entity' });
         if (!db.objectStoreNames.contains(STORES.META)) db.createObjectStore(STORES.META, { keyPath: 'key' });
+        if (!db.objectStoreNames.contains(STORES.PENDING_OCR)) db.createObjectStore(STORES.PENDING_OCR, { keyPath: 'id' });
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // 多 Tab 不互锁：他方请求更高版本触发本连接 versionchange 时主动让出关闭，
+        // 并复位连接缓存（下次调用按新版本重开）——升级不再被旧连接永久阻塞
+        db.onversionchange = () => {
+          try {
+            db.close();
+          } catch { /* 已关闭则忽略 */ }
+          _dbPromise = null;
+        };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
     });
     _dbPromise.catch(() => { _dbPromise = null; });
@@ -239,4 +261,52 @@ export async function metaPut(key, value) {
   const db = await openDB();
   const tx = db.transaction(STORES.META, 'readwrite');
   await waitRequest(tx.objectStore(STORES.META), tx.objectStore(STORES.META).put({ key, value }));
+}
+
+/* ---------------------- pending_ocr：持仓截图待识别队列（T7） ---------------------- */
+
+/**
+ * 待识别截图入队（后端不可达时存 dataURL，online 后由体检页补识别）。
+ * @param {PendingOcrItem} item 至少含 id/dataUrl/engine/createdAt
+ * @returns {Promise<PendingOcrItem>} 实际写入的记录
+ */
+export async function pendingOcrPut(item) {
+  const db = await openDB();
+  const tx = db.transaction(STORES.PENDING_OCR, 'readwrite');
+  await waitRequest(tx.objectStore(STORES.PENDING_OCR), tx.objectStore(STORES.PENDING_OCR).put(item));
+  return item;
+}
+
+/**
+ * 列出全部待识别截图（按入队时间先后，先到先识别）。
+ * @returns {Promise<PendingOcrItem[]>}
+ */
+export async function pendingOcrList() {
+  const db = await openDB();
+  const tx = db.transaction(STORES.PENDING_OCR, 'readonly');
+  const all = await waitRequest(tx.objectStore(STORES.PENDING_OCR), tx.objectStore(STORES.PENDING_OCR).getAll());
+  return /** @type {PendingOcrItem[]} */ ((all ?? []).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)));
+}
+
+/**
+ * 读单条待识别截图。
+ * @param {string} id
+ * @returns {Promise<PendingOcrItem|null>} 不存在返回 null
+ */
+export async function pendingOcrGet(id) {
+  const db = await openDB();
+  const tx = db.transaction(STORES.PENDING_OCR, 'readonly');
+  const rec = await waitRequest(tx.objectStore(STORES.PENDING_OCR), tx.objectStore(STORES.PENDING_OCR).get(id));
+  return rec ?? null;
+}
+
+/**
+ * 删除单条待识别截图（补识别成功且确认表已处理，或用户明确放弃后调用）。
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export async function pendingOcrDelete(id) {
+  const db = await openDB();
+  const tx = db.transaction(STORES.PENDING_OCR, 'readwrite');
+  await waitRequest(tx.objectStore(STORES.PENDING_OCR), tx.objectStore(STORES.PENDING_OCR).delete(id));
 }

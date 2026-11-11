@@ -8,13 +8,13 @@
   <title>持家 · 计算器</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.7">
 </head>
 <body data-page="calculator">
 
   <header class="page-head">
     <h1>🧮 计算器</h1>
-    <p class="page-sub">FIRE 三档模型（独立工具页；内部金额单位为「万」，勿与「元」混用）</p>
+    <p class="page-sub">FIRE 分层三档模型（真实购买力口径；内部金额单位「万」，勿与「元」混用）</p>
   </header>
 
   <main class="page">
@@ -24,11 +24,43 @@
       <button class="banner-close" id="prefill-close" type="button" aria-label="关闭">✕</button>
     </div>
 
-    <section id="calc-mount" aria-label="FIRE 三档模型">
-      <p class="empty">调整月收入 / 月支出 / 收益率 / 本金后，三档（轻盈 / 标准 / 富裕）年限实时更新。</p>
+    <section id="calc-mount" aria-label="FIRE 分层三档模型">
+      <p class="empty">调整月收入 / 月支出 / 收益率 / 本金 / 孩数后，三档（轻盈 / 标准 / 富裕）目标本金与年限实时更新。</p>
     </section>
 
-    <p class="hint">档位口径：目标本金 = 年支出 × 20（轻盈）/ × 30（标准）/ × 40（富裕）；示例模型，非投资建议。报告页「发送」会把收入/支出/本金预填到本页（FFC_PREFILL，30 分钟内有效）。</p>
+    <!-- 模型公式与假设（T6：页面内明示公式，保留 v1 透明度） -->
+    <details class="panel" id="calc-formulas">
+      <summary>📐 模型公式与假设</summary>
+      <div class="panel-body">
+        <p><b>真实收益率</b>（所有折现与复利都用它，今天的钱口径）：
+        <code>rReal = (1 + 长期收益率) ÷ (1 + 个人账单通胀) − 1</code></p>
+        <table class="data-table">
+          <thead><tr><th>档位（递进分层）</th><th>公式</th></tr></thead>
+          <tbody>
+            <tr><td>🪶 轻盈 · 生活池</td><td>年支出 ÷ rReal</td></tr>
+            <tr><td>🏡 标准 · 含育儿</td><td>轻盈 + 孩数 × 每孩育儿折现</td></tr>
+            <tr><td>🌊 富裕 · 含健康</td><td>标准 + 健康池原值 + 重大投入折现</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">育儿折现：<code>每孩现值 = (每孩成本 ÷ 18) × annuity(18, rReal)</code>，其中
+          <code>annuity(n, rr) = rr ≤ 0 ? n : (1 − (1+rr)^−n) ÷ rr</code>（18 年年金现值系数）——
+          育儿成本摊在备孕到 18 岁逐年支出，钱先在组合里增值，故折现后低于名义成本（默认 108 万/孩按 v1 默认参数约折现至 93 万）。</p>
+        <p class="hint">健康池按<b>原值不折现</b>（刻意保守）：医疗通胀长期偏高且波动大，老年支出时点与金额不确定，精确折现反而危险。
+          重大投入折现：<code>现值 = 金额 ÷ (1 + max(rReal, 0))^年数</code>；rReal ≤ 0 时按原值计入。</p>
+        <p class="hint"><b>个人账单通胀</b>默认 2.33%：按 v1 默认账单构成加权（房租 ≈ CPI+0.5pp、饮食 ≈ CPI−0.5pp、
+          医疗 ≈ CPI+2.5pp、其他 ≈ CPI；v1 默认月支出 1 万 = 房租 4000 + 饮食 25% + 医疗 10% + 其余，加权 π ≈ 2.325%）。可在参数里直接改。</p>
+        <p class="hint"><b>口径说明 · 永续 vs 提取率（SWR）</b>：本页三档均为「本金不动」的永续口径——投资收益覆盖开销并追上物价，
+          本金购买力不损耗。「安全提取率（SWR）」则<b>允许本金慢慢花</b>（每年提取固定比例，源自美股百年回测的 4% 法则；
+          中国市场波动更大，常打折到 3~3.5%）：生活池需求降为「年支出 ÷ 提取率」，数字显著更低，但并非严格意义的永远。
+          提取率越低越接近永续。</p>
+        <p class="hint"><b>公式失效边界</b>：当长期收益率 ≤ 个人账单通胀时 rReal ≤ 0，「本金不动」口径分母 ≤ 0，
+          在数学上不可能实现（日本过去三十年的教训）——页面会明确提示，此时仅「提取率（SWR）」口径可行。</p>
+        <p class="hint"><b>数据来源</b>：每孩成本 108 万默认值取《中国生育成本报告》上海口径（备孕至 18 岁平均）；
+          通胀锚点为长期经验值，可按最新数据自行调整参数。</p>
+      </div>
+    </details>
+
+    <p class="hint">三档为递进分层口径：轻盈=只算日常生活，标准=含育儿，富裕=再含健康池与重大投入；目标口径为「本金不动（永续）」。示例模型，非投资建议。计划页参数变化会持续同步到本页（FFC_PREFILL）。</p>
   </main>
 
   <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
@@ -36,6 +68,12 @@
   <script type="module">
     /**
      * 计算器：独立工具页，独立初始化（不调用 core.boot，不依赖计划/分析数据）。
+     * T6 模型移植（v1 公式体系，用户已确认）：
+     *   - rReal = (1+长期收益率)/(1+个人账单通胀) − 1（真实购买力口径）
+     *   - 三档 = 递进分层：轻盈=生活池(年支出÷rReal)；标准=+育儿(108万/孩按 18 年
+     *     年金现值折现，annuity)；富裕=+健康池原值+重大投入折现（废除旧 ×20/30/40）
+     *   - 「还要多少年」：真实购买力逐年模拟（本金按 rReal 复利 + 年结余累加）
+     *   - rReal ≤ 0：永续口径公式失效，页面明确提示（v1 同款处理）
      * 内部金额单位「万」：输入输出均以万计（1.5 = 1.5 万 = 15,000 元）。
      */
 
@@ -52,69 +90,113 @@
       const s = (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
       return s;
     };
+    const pct = (v, d = 2) => (Math.round(v * 100 * 10 ** d) / 10 ** d).toFixed(d);
 
-    /* ----------------------------- 三档 FIRE 模型 ----------------------------- */
+    /* ------------------------ v1 移植：核心公式 ------------------------ */
 
-    const TIERS = [
-      { key: 'lean', name: '🪶 轻盈（lean）', mult: 20, desc: '年支出 × 20' },
-      { key: 'comfort', name: '🏡 标准（comfort）', mult: 30, desc: '年支出 × 30' },
-      { key: 'rich', name: '🌊 富裕（rich）', mult: 40, desc: '年支出 × 40' },
+    /** v1 annuity(n, rr)：n 年年金现值系数；rr≤0 退化为 n（不折现） */
+    function annuity(n, rr) { return rr <= 1e-9 ? n : (1 - Math.pow(1 + rr, -n)) / rr; }
+
+    /** 真实收益率：rReal = (1+r)/(1+π) − 1（小数）；π 与 r 均为小数 */
+    const realRate = (r, pi) => (1 + r) / (1 + pi) - 1;
+
+    /* --------------------------- 参数与三档模型 --------------------------- */
+
+    const state = {
+      income: 1.5,      // 万/月（计划页联动）
+      spend: 0.6,       // 万/月（含房租全口径生活支出，计划页联动）
+      principal: 50,    // 万（当前可生息本金，计划页联动）
+      rate: 0.04,       // 长期收益率（小数，默认 4%）
+      pi: 0.0233,       // 个人账单通胀（小数，默认 ≈ v1 默认账单构成加权 2.33%）
+      kids: 0,          // 孩数（默认 0）
+      childCost: 108,   // 每孩成本（万，默认 108）
+      health: 60,       // 健康池（万，原值不折现）
+      invest: 0,        // 重大投入（万）
+      investYears: 0,   // 重大投入发生时间（年后）
+    };
+
+    /** 输入定义：[key, 标签, step]；percent 组内部存小数、界面显示百分数 */
+    const FIELDS = [
+      { key: 'income', label: '月收入（万）', step: 0.1, min: 0 },
+      { key: 'spend', label: '月支出（万）', step: 0.1, min: 0 },
+      { key: 'principal', label: '当前可生息本金（万）', step: 1, min: 0 },
+      { key: 'rate', label: '长期收益率（%）', step: 0.1, min: 0, percent: true },
+      { key: 'pi', label: '个人账单通胀（%）', step: 0.01, min: 0, percent: true },
+      { key: 'kids', label: '孩数（个）', step: 1, min: 0, max: 6, int: true },
+      { key: 'childCost', label: '每孩成本（万）', step: 1, min: 0 },
+      { key: 'health', label: '健康池（万）', step: 1, min: 0 },
+      { key: 'invest', label: '重大投入（万）', step: 1, min: 0 },
+      { key: 'investYears', label: '重大投入时点（年后）', step: 1, min: 0, max: 30, int: true },
     ];
 
     /**
-     * 达到目标本金所需年数：月度复利 + 月结余定投；超过 100 年视为达不到。
-     * @returns {number|null} 年数（1 位小数）；达不到返回 null
+     * 分层本金需求（v1 公式移植；返回各层现值，单位万）：
+     *   life   生活池 = 年支出 ÷ rReal（rReal ≤ 0 → Infinity，公式失效）
+     *   child  育儿   = 孩数 × (每孩成本 ÷ 18) × annuity(18, rReal)（rReal ≤ 0 退化为原值）
+     *   health 健康池 = 原值不折现
+     *   invest 重大投入 = 金额 ÷ (1+max(rReal,0))^年数（rReal ≤ 0 不折现）
      */
-    function yearsToTarget(targetWan, monthlySaveWan, rate, principalWan) {
-      const rm = rate / 12;
-      let bal = principalWan;
-      for (let m = 1; m <= 1200; m++) {
-        bal = bal * (1 + rm) + monthlySaveWan;
-        if (bal >= targetWan) return Math.round((m / 12) * 10) / 10;
-      }
-      return null;
+    function computeLayers() {
+      const rReal = realRate(state.rate, state.pi);
+      const ySpend = state.spend * 12; // 万/年
+      const childPV = (state.childCost / 18) * annuity(18, rReal);
+      const investPV = state.invest / Math.pow(1 + Math.max(rReal, 0), state.investYears);
+      return {
+        rReal,
+        ySpend,
+        life: rReal > 1e-6 ? ySpend / rReal : Infinity,
+        child: state.kids * childPV,
+        childEach: childPV,
+        health: state.health,
+        invest: investPV,
+      };
     }
 
-    const state = { income: 1.5, spend: 0.6, rate: 0.05, principal: 50 };
+    /**
+     * v1 移植：还要多少年——真实购买力口径逐年模拟。
+     * 本金按 rReal 复利增长、每年叠加年结余，追到目标为止（99 年上限）。
+     * @returns {{years:number|null, state:'done'|'ok'|'never'|'nostash'}} done=已达成；never=99 年+；nostash=无结余
+     */
+    function yearsToTarget(target, rReal) {
+      const P0 = state.principal;
+      const Cw = Math.max(0, state.income - state.spend) * 12; // 万/年
+      if (P0 >= target) return { years: 0, state: 'done' };
+      if (Cw <= 0) return { years: null, state: 'nostash' };
+      let P = P0;
+      let n = 0;
+      for (n = 1; n <= 99; n++) {
+        P = P * (1 + rReal) + Cw;
+        if (P >= target) return { years: n, state: 'ok' };
+      }
+      return { years: null, state: 'never' };
+    }
+
+    /** 改动④：buildCalc 注册的重渲染句柄——壳直达钩子重放预填后，
+     *  把已更新的 state 同步回输入框并刷新三档读数（启动路径无需此步） */
+    let refreshCalc = null;
 
     function buildCalc(mount) {
       mount.textContent = '';
       const grid = el('div', 'pp-grid');
-      const fields = [
-        ['income', '月收入（万）', 0.1],
-        ['spend', '月支出（万）', 0.1],
-        ['principal', '当前本金（万）', 1],
-      ];
       const inputs = {};
-      for (const [key, label, step] of fields) {
-        const lab = el('label', 'pp-field', `<span>${label}</span>`);
+      for (const f of FIELDS) {
+        const lab = el('label', 'pp-field', `<span>${f.label}</span>`);
         const input = el('input');
         input.type = 'number';
-        input.min = '0';
-        input.step = String(step);
-        input.value = String(state[key]);
+        input.inputMode = 'decimal';
+        input.min = String(f.min ?? 0);
+        if (f.max != null) input.max = String(f.max);
+        input.step = String(f.step);
+        input.value = fmtField(f);
         input.addEventListener('input', () => {
           const v = Number(input.value);
-          if (Number.isFinite(v) && v >= 0) { state[key] = v; render(); }
+          if (!Number.isFinite(v) || v < (f.min ?? 0)) return;
+          state[f.key] = f.int ? Math.round(v) : (f.percent ? v / 100 : v);
+          render();
         });
         lab.appendChild(input);
         grid.appendChild(lab);
-        inputs[key] = input;
-      }
-      {
-        const lab = el('label', 'pp-field', '<span>年化收益率（%）</span>');
-        const input = el('input');
-        input.type = 'number';
-        input.min = '0';
-        input.step = '0.5';
-        input.value = String(Math.round(state.rate * 1000) / 10);
-        input.addEventListener('input', () => {
-          const v = Number(input.value);
-          if (Number.isFinite(v) && v >= 0) { state.rate = v / 100; render(); }
-        });
-        lab.appendChild(input);
-        grid.appendChild(lab);
-        inputs.rate = input;
+        inputs[f.key] = input;
       }
       mount.appendChild(grid);
 
@@ -122,33 +204,93 @@
       mount.appendChild(result);
       render();
 
-      /** 参数改动实时更新（UX-SPEC 流程③） */
-      function render() {
-        result.textContent = '';
-        const save = Math.max(0, state.income - state.spend);
-        const head = el('div', 'callout');
-        // 结余为负时给出红字提醒（禁止静默）
-        if (state.income < state.spend) {
-          head.className = 'callout danger';
-          head.innerHTML = `⚠ 月收入 ${fw(state.income)} 万 < 月支出 ${fw(state.spend)} 万：当前入不敷出，无法积累本金。`;
-        } else {
-          head.className = 'callout';
-          head.innerHTML = `月结余 <b>${fw(save)} 万</b>（月收入 ${fw(state.income)} − 月支出 ${fw(state.spend)}）· 年支出 ${fw(state.spend * 12)} 万 · 年化 ${Math.round(state.rate * 1000) / 10}%`;
-        }
-        result.appendChild(head);
-
-        const grid2 = el('div', 'card-grid');
-        for (const tier of TIERS) {
-          const target = state.spend * 12 * tier.mult;
-          const years = yearsToTarget(target, save, state.rate, state.principal);
-          const card = el('div', 'card stat-card');
-          card.appendChild(el('div', 'stat-lab hint', tier.name + ' · ' + tier.desc));
-          card.appendChild(el('div', 'stat-val num', years == null ? '100 年+' : `${years} 年`));
-          card.appendChild(el('div', 'stat-note hint', `目标本金 ${fw(target)} 万`));
-          grid2.appendChild(card);
-        }
-        result.appendChild(grid2);
+      /** 改动④：state → 输入框回写（重放预填后界面与内部状态一致） */
+      function syncInputs() {
+        for (const f of FIELDS) inputs[f.key].value = fmtField(f);
       }
+      refreshCalc = () => { syncInputs(); render(); };
+    }
+
+    /** state 值 → 输入框显示（percent 字段 ×100，去掉浮点尾差） */
+    function fmtField(f) {
+      const v = state[f.key];
+      if (f.percent) return String(Math.round(v * 10000) / 100);
+      return String(f.int ? Math.round(v) : v);
+    }
+
+    /** 参数改动实时更新（UX-SPEC 流程③） */
+    function render() {
+      const result = document.querySelector('#calc-mount .calc-result');
+      if (!result) return;
+      result.textContent = '';
+      const L = computeLayers();
+      const save = Math.max(0, state.income - state.spend);
+
+      // 摘要 callout：入不敷出红字提醒（禁止静默）
+      const head = el('div', 'callout');
+      if (state.income < state.spend) {
+        head.className = 'callout danger';
+        head.innerHTML = `⚠ 月收入 ${fw(state.income)} 万 < 月支出 ${fw(state.spend)} 万：当前入不敷出，无法积累本金。`;
+      } else {
+        head.className = 'callout';
+        head.innerHTML =
+          `月结余 <b>${fw(save)} 万</b>（收入 ${fw(state.income)} − 支出 ${fw(state.spend)}）· ` +
+          `年支出 ${fw(L.ySpend)} 万 · 真实收益率 <b>${pct(L.rReal)}%</b>` +
+          `（(1+${pct(state.rate, 1)}%) ÷ (1+${pct(state.pi)}%) − 1）`;
+      }
+      result.appendChild(head);
+
+      // v1 同款：rReal ≤ 0 → 永续口径公式失效，明确提示（禁止静默）
+      const dead = !Number.isFinite(L.life);
+      if (dead) {
+        const warn = el('div', 'callout danger');
+        warn.innerHTML =
+          `⚠ 公式失效：长期收益率 ${pct(state.rate, 1)}% ≤ 个人账单通胀 ${pct(state.pi)}%，真实收益率 ≤ 0——` +
+          `「本金不动（永续）」口径的分母 ≤ 0，数学上不可能实现（详见「模型公式与假设」）。` +
+          `可改用「安全提取率（SWR）」口径（允许本金慢慢花，生活池 ≈ 年支出 ÷ 提取率）或调整参数。`;
+        result.appendChild(warn);
+      }
+
+      // 三档（递进分层）：轻盈=生活池；标准=+育儿；富裕=+健康+重大投入
+      const tiers = [
+        {
+          name: '🪶 轻盈 · 生活池',
+          target: L.life,
+          layers: `生活池 = 年支出 ${fw(L.ySpend)} 万 ÷ rReal ${pct(L.rReal)}%`,
+        },
+        {
+          name: '🏡 标准 · 含育儿',
+          target: L.life + L.child,
+          layers: `轻盈 + 育儿 ${fw(L.child)} 万（${state.kids} 孩 × 每孩折现 ${fw(L.childEach)} 万）`,
+        },
+        {
+          name: '🌊 富裕 · 含健康',
+          target: L.life + L.child + L.health + L.invest,
+          layers: `标准 + 健康池 ${fw(L.health)} 万（原值）+ 重大投入 ${fw(L.invest)} 万（折现）`,
+        },
+      ];
+
+      const grid2 = el('div', 'card-grid');
+      for (const tier of tiers) {
+        const card = el('div', 'card stat-card');
+        card.appendChild(el('div', 'stat-lab hint', tier.name));
+        if (dead) {
+          card.appendChild(el('div', 'stat-val hint', '公式失效'));
+          card.appendChild(el('div', 'stat-note hint', '真实收益率 ≤ 0，永续口径无法实现'));
+        } else {
+          card.appendChild(el('div', 'stat-val num', `${fw(tier.target)} 万`));
+          const y = yearsToTarget(tier.target, L.rReal);
+          const note =
+            y.state === 'done' ? `已达成 🎉（现有 ${fw(state.principal)} 万 ≥ 目标）`
+              : y.state === 'nostash' ? '无法积累（月收入 ≤ 月支出）'
+                : y.state === 'never' ? '99 年+（提高收益或投入）'
+                  : `还要约 ${y.years} 年（现有 ${fw(state.principal)} · 年投 ${fw(save * 12)} 万）`;
+          card.appendChild(el('div', 'stat-note hint', note));
+        }
+        card.appendChild(el('div', 'stat-note hint', tier.layers));
+        grid2.appendChild(card);
+      }
+      result.appendChild(grid2);
     }
 
     /* --------------------------- FFC_PREFILL（D5 保留） --------------------------- */
@@ -159,11 +301,12 @@
         pre = JSON.parse(localStorage.getItem('FFC_PREFILL') ?? 'null');
       } catch { pre = null; }
       if (!pre || !pre.fields) return;
+      // TTL 30 分钟仅作兜底（T6：计划页参数变化即持续刷新本键，无过期语义）
       if (!Number.isFinite(Number(pre.ts)) || Date.now() - Number(pre.ts) > 30 * 60 * 1000) {
         try { localStorage.removeItem('FFC_PREFILL'); } catch { /* 忽略 */ }
         return;
       }
-      // 元 → 万（跨页契约：报告页以元计，计算器内部以万计）
+      // 元 → 万（跨页契约：计划页以元计，计算器内部以万计）
       const toWan = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) / 10000 : null);
       const income = toWan(pre.fields.income);
       const spend = toWan(pre.fields.spend);
@@ -182,14 +325,24 @@
       const rawLabel = String(pre.label ?? '报告页');
       const label = rawLabel.replace(/^来自/, '') || rawLabel;
       $('prefill-text').textContent =
-        `已自动填入来自「${label}」的参数：${parts.join(' · ')}（30 分钟内有效）。`;
+        `已自动填入来自「${label}」的参数：${parts.join(' · ')}（计划页参数变化会自动更新）。`;
       $('prefill-banner').hidden = false;
-      $('prefill-close').addEventListener('click', () => { $('prefill-banner').hidden = true; });
+      // 改动④：改赋值 onclick——壳内「发送到计算器」会重放预填，避免重复 addEventListener
+      $('prefill-close').onclick = () => { $('prefill-banner').hidden = true; };
     }
 
     applyPrefill();
     buildCalc($('calc-mount'));
     document.body.dataset.ready = 'calculator';
+
+    // 改动④：壳切 Tab 直达钩子——计算器 iframe 已加载过时，FFC_PREFILL 不会在
+    // 启动路径再次消费；计划页「🧮 发送到计算器」经壳调本钩子重放预填并重渲染。
+    window.__chijia = {
+      applyPrefill() {
+        applyPrefill();
+        refreshCalc?.(); // 同步输入框与三档读数（首次启动路径 refreshCalc 由 buildCalc 注册）
+      },
+    };
 
     if ('serviceWorker' in navigator) {
       addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));

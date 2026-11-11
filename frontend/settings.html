@@ -8,7 +8,7 @@
   <title>持家 · 设置</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.7">
 </head>
 <body data-page="settings">
 
@@ -150,9 +150,41 @@
           alert('导入失败：文件不是合法 JSON（' + e.message + '）。\n下一步：确认导出的是「导出备份 JSON」生成的文件。');
           return;
         }
+        /* ⑩ 兼容 v1 包装格式 {app,version,exportedAt,note,data:{meta,parts,...}}：
+         * 解析后先识别包装层——data 内层含 meta+parts 即解包后再走原校验；
+         * data 存在但内层不是 DATA 数据包时给出明确文案；裸 DATA 格式原样接受。 */
+        if (obj && typeof obj === 'object' && obj.data && typeof obj.data === 'object') {
+          if (obj.data.meta && Array.isArray(obj.data.parts)) {
+            obj = obj.data;
+          } else {
+            alert('导入失败：这是 v1 包装格式（{app,version,data}），但包装格式内层不是 DATA 数据包（缺少 meta 或 parts）。\n下一步：确认导出来源与文件是否选对。');
+            return;
+          }
+        }
         if (!obj || typeof obj !== 'object' || !obj.meta || !Array.isArray(obj.parts)) {
           alert('导入失败：JSON 结构不是 DATA 数据包（缺少 meta 或 parts）。\n下一步：检查是否选错了文件。');
           return;
+        }
+        /* ⑩ 部分编号/锚点归一：v1 包 parts 用 no:'第一部分'…、id:'pb1/pb2/pb3'，
+         * v2 契约为 no:'1'|'2'|'3'、id:'plan'|'txns'|'health'（计划/分析页按 no/id 选取章节）。
+         * 导入前按 v1 命名映射（第一→1/plan、第二→2/txns、第三→3/health），
+         * 已符合 v2 契约的值原样保留（幂等）。块词表两代一致（docs/DATA.md），无需转换。 */
+        const NO_MAP = { 第一部分: '1', 第二部分: '2', 第三部分: '3' };
+        const ID_BY_PB = { pb1: 'plan', pb2: 'txns', pb3: 'health' };
+        for (const p of Array.isArray(obj.parts) ? obj.parts : []) {
+          if (!p || typeof p !== 'object') continue;
+          if (NO_MAP[p.no] != null) p.no = NO_MAP[p.no];
+          if (ID_BY_PB[p.id] != null) p.id = ID_BY_PB[p.id];
+        }
+        /* ⑩ 规则形制归一：v1 数据包的 importer 关键词可为字符串（如 employer: '华为'），
+         * v2 契约为 string[]（classify/fillRulesHint 按 .some/.join 消费）。
+         * 导入落库前统一归一，避免 v1 包导入后分类规则与 2.x 统计崩溃。 */
+        const imp = obj.meta?.importer;
+        if (imp && typeof imp === 'object') {
+          const toList = (v) => (Array.isArray(v) ? v : v == null || v === '' ? [] : [String(v)]);
+          imp.employer = toList(imp.employer);
+          imp.subsidyKeywords = toList(imp.subsidyKeywords);
+          imp.skipTypes = toList(imp.skipTypes);
         }
         if (!confirm('导入数据包将覆盖当前账本主数据（DATA 全量），确认继续？')) return;
         try {
@@ -179,8 +211,11 @@
       rowDel.append(btnReset);
       box.appendChild(rowDel);
 
-      /* 快照管理 */
-      box.appendChild(el('h4', null, '快照管理'));
+      /* 快照管理（改动⑥：#snapshots 锚点供首页④「去做备份」直达滚动到位） */
+      const snapArea = el('div');
+      snapArea.id = 'snapshots';
+      box.appendChild(snapArea);
+      snapArea.appendChild(el('h4', null, '快照管理'));
       const snapRow = el('div', 'form-row');
       const labLabel = el('label', null, '<span>快照标签</span>');
       const labelInput = el('input');
@@ -199,10 +234,10 @@
         }
       });
       snapRow.append(labLabel, btnSnap);
-      box.appendChild(snapRow);
+      snapArea.appendChild(snapRow);
 
       const snapBox = el('div', 'snap-box');
-      box.appendChild(snapBox);
+      snapArea.appendChild(snapBox);
       async function refreshSnapshots() {
         snapBox.textContent = '';
         try {
@@ -691,29 +726,44 @@
       }
     }
 
-    /** 首载路径：等首次渲染（3s 兜底）再滚；已渲染路径（二次直达/hash 直开）：立即执行 */
-    function scrollToPanelWhenReady(panel) {
-      panel.open = true; // 展开不等渲染：点按即有可见反馈（UX-SPEC §3）
+    /** 首载路径：等首次渲染（3s 兜底）再滚；已渲染路径（二次直达/hash 直开）：立即执行。
+     *  改动⑥：目标可为 details 面板（自动展开）或面板内锚点（如 #snapshots）。 */
+    function scrollToTargetWhenReady(target) {
+      if (target instanceof HTMLDetailsElement) target.open = true; // 展开不等渲染：点按即有可见反馈（UX-SPEC §3）
       if (_pageRendered) {
-        void focusWithRetries(panel);
+        void focusWithRetries(target);
         return;
       }
       let done = false;
       const run = () => {
         if (done) return;
         done = true;
-        void focusWithRetries(panel); // 首滚 smooth 在此发起；instant 校正见上
+        void focusWithRetries(target); // 首滚 smooth 在此发起；instant 校正见上
       };
       addEventListener('chijia:rendered', run, { once: true });
       setTimeout(run, 3000); // 渲染事件异常缺失时兜底，保证最终必滚
     }
 
-    // 壳「📥 去导入流水」直达钩子（UX-SPEC 流程①：导入面板默认展开且可见）
+    // 壳首页直达钩子（改动⑥：四步卡片嵌入按钮；UX-SPEC 流程①：目标面板自动展开并滚动到位）
     window.__chijia = {
+      /** ② 导流水 → 导入面板 */
       focusImporter() {
         const panel = $('panel-import');
         if (!panel) return;
-        scrollToPanelWhenReady(panel); // BUG-008：首载等渲染就绪再滚（plan 页 focusParams 同法）
+        scrollToTargetWhenReady(panel); // BUG-008：首载等渲染就绪再滚（plan 页 focusParams 同法）
+      },
+      /** ① 建账本 → 数据包备份面板 */
+      focusBackup() {
+        const panel = $('panel-backup');
+        if (!panel) return;
+        scrollToTargetWhenReady(panel);
+      },
+      /** ④ 做备份 → 快照管理区域（备份面板展开后滚到 #snapshots 锚点） */
+      focusSnapshots() {
+        const panel = $('panel-backup');
+        if (!panel) return;
+        panel.open = true;
+        scrollToTargetWhenReady($('snapshots') ?? panel);
       },
     };
 

@@ -9,7 +9,8 @@
     1. 自起后端  `python backend/app.py --port 8411`（默认 8411，避开 8410/8412）。
     2. 读取 backend/data/token.txt 作为鉴权 token（首启自动生成，不改动）。
     3. 逐项执行契约断言（pm/contract.md v1.0 + 章程裁决 D9~D30），打印 PASS/FAIL。
-    4. 停止后端进程，删除测试产生的 backend/data/chijia.db*（token.txt / config.json 不动）。
+    4. 停止后端进程，删除测试产生的 backend/data/chijia.db*（token.txt / config.json 不动）；
+       删除前有端口守卫（D26 整改，见下）——8410/8411 有监听则不删、告警、跳过清理。
     5. 全部 PASS 退出码 0；任一 FAIL 退出码 1；环境故障（起服失败/端口占用）退出码 2。
 
 注意：
@@ -18,6 +19,11 @@
     - 测试时间戳以「服务端 serverTime - 1000 秒」为基准，确保全部测试写早于 restore 的
       「当前时刻」前向写（D11/D17 语义需要）；因此测试依赖启动时能删除历史 chijia.db*。
       若历史 db 被占用（如并行 dev 服务），脚本会告警并尽力继续（用例均已写成不依赖初始空库）。
+    - D26 纪律（章程「测试环境约定」）：用户实例（8410）运行期间禁止跑回归。本脚本的
+      db 清理内置端口守卫：检测到 8410/8411 有监听即拒绝删除 backend/data/chijia.db*，
+      防止把用户运行中的数据库误删（2026-11 事故整改）。守卫只保住文件不被删；测试本体
+      仍会自起 8411 实例，而该实例与用户实例共用同一个 db 文件，写测数据会污染用户数据
+      ——严肃回归必须先停用户实例或改在项目副本（隔离沙箱）里跑。
 """
 
 from __future__ import annotations
@@ -43,11 +49,18 @@ RESTORE_DEVICE_ID = "server-restore"
 HEALTH_TIMEOUT_S = 30.0
 REQ_TIMEOUT_S = 15.0
 
+# D26 纪律（章程「测试环境约定」：开发服务持库期间不跑回归）：删除 chijia.db* 前先探测
+# 这些端口，任一有监听即视为可能有 chijia 后端（尤其 8410 用户实例）正在使用该库，
+# 此时绝不删库（2026-11 两次误删用户库事故的防呆整改）。探测用 socket connect（port_busy），
+# 不依赖 psutil；对端是谁不区分——宁可误跳过，不可误删除。
+GUARD_PORTS = (8410, 8411)
+
 # ------------------------------------------------------------------------- 基础设施
 
 _failures: list[str] = []
 _error_bodies: list[tuple[str, int, object]] = []  # ERR-05 汇总用：所有预期错误响应
 _case_no = 0
+_cleanup_skipped: str | None = None  # 端口守卫跳过清理的原因（汇总时提醒）
 
 
 def _now_ms() -> int:
@@ -133,7 +146,22 @@ def port_busy(port: int) -> bool:
 
 
 def delete_db_files(label: str) -> list[str]:
-    """删除 backend/data/chijia.db*（绝不触碰 token.txt / config.json），返回失败清单。"""
+    """删除 backend/data/chijia.db*（绝不触碰 token.txt / config.json），返回失败清单。
+
+    端口守卫（D26 整改）：删除前探测 GUARD_PORTS，任一有监听 → 不删库、打印醒目警告、
+    跳过清理并返回空清单（此时不视为删除失败，测试流程继续）。
+    """
+    global _cleanup_skipped
+    busy = [p for p in GUARD_PORTS if port_busy(p)]
+    if busy:
+        _cleanup_skipped = f"端口 {busy} 有监听"
+        print("\n  " + "!" * 62)
+        print(f"  !!! [GUARD] 检测到用户实例运行中，跳过数据库清理（端口 {busy} 有监听）")
+        print("  !!! backend/data/chijia.db* 保留未动。D26 纪律：用户实例运行期间禁止跑回归；")
+        print("  !!! 8411 测试实例与用户实例共用同一 db 文件，本次跑测可能污染用户数据，")
+        print("  !!! 请先停掉用户实例（或在项目隔离副本里）再跑回归。")
+        print("  " + "!" * 62)
+        return []
     failed = []
     for name in DB_FILES:
         p = PROJECT_ROOT / "backend" / "data" / name
@@ -693,6 +721,9 @@ def main() -> int:
     failed = len(_failures)
     print("\n" + "=" * 64)
     print(f"汇总：{total} 项，PASS {total - failed} / FAIL {failed}")
+    if _cleanup_skipped:
+        print(f"[NOTE] 数据库清理已跳过（{_cleanup_skipped}）——backend/data/chijia.db* 保留；"
+              f"测试数据仍留在库中，下次无用户实例运行时会随预清理删除。")
     if _failures:
         print("失败项：")
         for f in _failures:

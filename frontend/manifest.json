@@ -2,7 +2,7 @@
   "name": "持家 chijia",
   "short_name": "持家",
   "description": "个人财务「持家」双端应用：账本、计划推演、流水分析、FIRE 计算器与组合体检。数据仅存本机。",
-  "version": "2.0.2",
+  "version": "2.0.7",
   "lang": "zh-CN",
   "start_url": "./index.html",
   "scope": "./",

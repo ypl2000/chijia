@@ -9,7 +9,7 @@
  */
 
 /* eslint-disable no-restricted-globals */
-const VERSION = 'v2.0.2';
+const VERSION = 'v2.0.7';
 const CACHE_NAME = `chijia-${VERSION}`;
 
 /** 壳资源预缓存（与页面引用保持同一 ?v= 以精确命中；离线首启兜底） */
@@ -22,7 +22,7 @@ const SHELL_ASSETS = [
   './portfolio.html',
   './settings.html',
   './report.html',
-  './app.css?v=2.0.2',
+  './app.css?v=2.0.7',
   './manifest.json',
   './icons/icon.svg',
   './src/core.js',
@@ -30,6 +30,9 @@ const SHELL_ASSETS = [
   './src/formats.js',
   './src/idb.js',
   './src/sync.js',
+  // ⑪ pdf.js 本地化：vendor 组件纳入预缓存（断网解析 PDF 可用）
+  './vendor/pdfjs/pdf.min.js',
+  './vendor/pdfjs/pdf.worker.min.js',
 ];
 
 /** 单条预缓存：fetch + put（等价 cache.add，可带 options）。
@@ -111,7 +114,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // 只管同源（CDN 的 pdf.js 不缓存）
+  if (url.origin !== self.location.origin) return; // 只管同源（pdf.js 已本地化为 vendor 同源资源，纳入缓存）
   if (url.pathname.startsWith('/api/')) return; // API 永远走网络
 
   if (req.mode === 'navigate' || NETWORK_FIRST_RE.test(url.pathname)) {

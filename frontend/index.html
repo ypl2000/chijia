@@ -9,7 +9,7 @@
   <title>持家 · 首页</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.7">
 </head>
 <body>
 
@@ -36,7 +36,7 @@
 
       <div class="page">
 
-        <!-- 引导四步（折叠面板默认展开，UX-SPEC §3） -->
+        <!-- 引导四步（折叠面板默认展开，UX-SPEC §3；改动⑥：直达按钮嵌入各卡片，直达入口面板已删） -->
         <details class="panel" id="home-guide" open>
           <summary>四步上手</summary>
           <div class="panel-body">
@@ -44,44 +44,35 @@
               <div class="card">
                 <h3>① 建账本</h3>
                 <p>设置页导入数据包 JSON——这是账本主数据：资产、计划、分析的完整快照。</p>
+                <button class="btn btn-primary card-go" data-go="settings" data-hook="focusBackup">🗂 去建账本</button>
               </div>
               <div class="card">
                 <h3>② 导流水</h3>
                 <p>设置页选择银行流水 PDF（或粘贴文本），本机解析、预览确认后应用到分析页。</p>
+                <button class="btn btn-primary card-go" data-go="settings" data-hook="focusImporter">📥 去导流水</button>
               </div>
               <div class="card">
                 <h3>③ 调计划</h3>
                 <p>计划页参数面板调整月度四池与收益率假设，一键重算 1.1~1.4 与期末预期。</p>
+                <button class="btn btn-primary card-go" data-go="plan" data-hook="focusParams">🎛 去调计划</button>
               </div>
               <div class="card">
                 <h3>④ 做备份</h3>
                 <p>设置页导出备份 JSON 或创建快照，把成果固化下来，随时可回滚。</p>
+                <button class="btn btn-primary card-go" data-go="settings" data-hook="focusSnapshots">📸 去做备份</button>
               </div>
             </div>
           </div>
         </details>
 
-        <!-- 数据规则说明 -->
+        <!-- 数据规则说明（改动⑥：保留） -->
         <details class="panel" id="home-rules" open>
           <summary>数据规则</summary>
           <div class="panel-body">
             <p><b>账本 · 主数据源</b>：DATA 数据包是资产、计划、分析的完整快照。</p>
             <p><b>凭证 · 补充输入</b>：银行流水 PDF 只更新流水统计（分析页 2.x）与当期余额，不覆盖账本其他内容。</p>
             <p><b>隐私边界</b>：流水解析在本机浏览器完成，原始 PDF 不上传、不落库；同步仅在自建后端与本机之间进行。</p>
-            <div class="callout ok">金额口径：千分位纯数字；计划页整数、流水页两位小数；带 <b>≈</b> 前缀表示估算值。</div>
-          </div>
-        </details>
-
-        <!-- 直达按钮组（章程 D2：跳转后目标面板自动展开并滚动到位） -->
-        <details class="panel" id="home-quick" open>
-          <summary>直达入口</summary>
-          <div class="panel-body">
-            <div class="quick-actions">
-              <button class="btn btn-primary" data-go="settings" data-hook="focusImporter">📥 去导入流水</button>
-              <button class="btn btn-primary" data-go="plan" data-hook="focusParams">🎛 去调参数</button>
-              <button class="btn btn-primary" data-go="analysis">🔎 去分析</button>
-            </div>
-            <p class="hint">三个按钮分别直达：设置页导入面板（自动展开）、计划页参数面板（自动展开并滚动到位）、分析页。</p>
+            <div class="callout ok">金额口径：千分位纯数字；计划页整数、流水页两位小数；估算值不再带 <b>≈</b>/= 前缀（原前缀位以等宽空占位对齐，数值列不位移）。</div>
           </div>
         </details>
 
@@ -161,6 +152,17 @@
     for (const b of document.querySelectorAll('[data-go]')) {
       b.addEventListener('click', () => activate(b.dataset.go, b.dataset.hook));
     }
+
+    // 改动④：iframe 页「🧮 发送到计算器」不再开新标签——壳收到消息后切 Tab
+    // （复用上方 activate 的 tab 切换 + 惰性加载；hook 供已加载页重放预填等）。
+    // 安全校验：仅接受同源壳内 iframe 帧发来的约定消息形状。
+    addEventListener('message', (e) => {
+      const d = e.data;
+      if (!d || d.src !== 'chijia-frame' || d.action !== 'goto') return;
+      const fromOurs = PAGES.some((p) => document.getElementById('frame-' + p)?.contentWindow === e.source);
+      if (!fromOurs || !views[d.tab]) return;
+      activate(d.tab, d.hook);
+    });
 
     // 支持 #plan 等 hash 直达（QA/分享链接用）
     const initial = location.hash.slice(1);

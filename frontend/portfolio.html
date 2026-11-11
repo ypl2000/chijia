@@ -8,21 +8,29 @@
   <title>持家 · 体检</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.7">
 </head>
 <body data-page="portfolio">
 
   <header class="page-head">
     <h1>🧪 体检</h1>
-    <p class="page-sub">组合四维红绿灯（独立工具页；金额单位为「元」）</p>
+    <p class="page-sub">组合五灯体检 · 按权益敞口计算（独立工具页；金额单位为「元」）</p>
   </header>
 
   <main class="page">
     <section id="pf-form-mount" aria-label="持仓录入"></section>
+    <section id="pf-ocr-mount" aria-label="截图导入持仓"></section>
     <section id="pf-mount" aria-label="组合体检结果">
-      <p class="empty">填入持仓后自动生成四维红绿灯体检报告。</p>
+      <div class="callout">
+        <b>体检边界</b>：只分析本页录入（pf_holdings）的资产——固定资产、公积金等不进体检；不做行情估值、净值波动与收益预测（成本份额补全后收益率维度留待下批）；全程本地计算、零外呼。若持有华为虚拟股（ESOP），建议录入以启用集中度从严检查。
+      </div>
+      <div id="pf-params-mount" aria-label="体检参数"></div>
+      <div id="pf-result-mount">
+        <p class="empty">填入持仓后自动生成五灯体检报告（每盏灯可展开查看判定依据与计入明细）。</p>
+      </div>
+      <div id="pf-holdings-mount" aria-label="持仓编辑器"></div>
     </section>
-    <p class="hint">四维口径（示例模型，非投资建议）：①集中度——最大单一持仓 ≤30% 🟢 / ≤50% 🟡 / 更高 🔴；②分散度——持仓品种 ≥5 🟢 / 3~4 🟡 / 更少 🔴；③现金覆盖——现金类占比 ≥10% 🟢 / ≥5% 🟡 / 更低 🔴；④个股占比——≤40% 🟢 / ≤60% 🟡 / 更高 🔴。持仓保存在本机 IndexedDB（pf_holdings 实体）。</p>
+    <p class="hint">五灯口径（按权益敞口计算，示例模型，非投资建议）：①应急覆盖＝（现金＋稳健敞口）÷月支出 M：≥6 月 🟢 / ≥3 月 🟡 / &lt;3 月 🔴；②单一集中度＝最大单一持仓÷组合：普通线 ≤30% 🟢 / ≤50% 🟡 / 更高 🔴，ESOP 从严线 ≤20% 🟢 / ≤40% 🟡 / &gt;40% 🔴；③权益配比＝权益敞口% vs 目标区间：区间内 🟢 / 偏一档 🟡 / 偏两档 🔴；④现金配比＝现金% vs 目标区间：同③；⑤分散度＝品种数＋类型覆盖：≥5 🟢 / 3~4 🟡 / ≤2 🔴（全部押同一类型不算分散）。权益敞口＝Σ(金额×权益比例)；稳健敞口＝组合−权益敞口−现金（债券与混合型的非权益部分、黄金与其他）。持仓保存在本机 IndexedDB（pf_holdings 实体）。</p>
   </main>
 
   <footer class="page-footer">持家 chijia · 数据仅存本机 · 无遥测</footer>
@@ -30,16 +38,25 @@
   <script type="module">
     /**
      * 体检：独立工具页，独立初始化（不调用 core.boot）。
-     * 持仓记忆存 idb 实体 pf_holdings（跨会话）；四维红绿灯 + 空态引导。
-     * 同步协议与 core 对齐（BUG-007）：保存动作先 commitChange 后 flushOutbox
-     * （离线静默，留待 online/下次 flush 重试），并挂 installAutoSync 自动重试。
-     * O-4：订阅 sync.js 的「sync-applied」采纳广播（BroadcastChannel 跨 iframe +
-     * window 事件），pf_holdings 命中即重读重渲染——壳内隐藏 iframe（Tab 切换仅
-     * display）在设置页「立即同步」后切回即为最新，不再需要整页刷新。
+     * 持仓记忆存 idb 实体 pf_holdings（跨会话）；同步协议与 core 对齐（BUG-007）：
+     * 保存动作先 commitChange 后 flushOutbox（离线静默），挂 installAutoSync 自动重试；
+     * O-4：订阅「sync-applied」采纳广播，pf_holdings/txns/plan 命中即重读重渲染。
+     * T7：📷 截图导入持仓——POST /api/portfolio/ocr 本地识别（数据不出机，501
+     * ocr_not_installed 提示装组件）/ POST /api/ai/vision GLM 视觉（默认隐藏入口：
+     * 空探测 501 ai_disabled 判定，可用才展示，且每次调用前弹「截图将发送至智谱云」
+     * 确认）；识别结果一律先入候选确认表（可勾选/内联修正名称·类型·权益%·金额），
+     * 确认后才写入 pf_holdings——绝不静默导入；后端不可达时截图转 dataURL 存
+     * idb pending_ocr 队列，online 自动补识别再弹确认表。
+     * T9：体检分析引擎——敞口比例模型（类型→默认权益%，逐条可改）替代黑盒分类；
+     * 本地词典＋场内代码前缀规则做导入类型/敞口自动建议（识别不出默认混合 50% 并
+     * 标注待确认）；体检参数三件套（月支出 M 自动取流水 D 类非跳过项月均、定投 I
+     * 自动取计划页投资池、目标配比可调）；五灯（应急覆盖/单一集中度/权益配比/现金
+     * 配比/分散度）全部按敞口计算并输出判定依据数字，每灯可展开计入明细；总评按
+     * 红/黄计数三色结论；建议生成器逐条产出「现状→目标→差额→按定投 I 推算补齐
+     * 月数」，按紧迫度排序，ESOP 超 20% 必出「停止认购、分红转指数」行动项。
      */
-    import { renderBlocks } from './src/core.js';
-    import { commitChange, kvGet } from './src/idb.js';
-    import { flushOutbox, installAutoSync, removeEntity } from './src/sync.js';
+    import { commitChange, kvGet, pendingOcrDelete, pendingOcrGet, pendingOcrList, pendingOcrPut } from './src/idb.js';
+    import { flushOutbox, getAuthToken, installAutoSync, removeEntity } from './src/sync.js';
 
     const $ = (id) => document.getElementById(id);
     const el = (tag, cls, html) => {
@@ -49,11 +66,65 @@
       return n;
     };
     const fmtInt = (v) => String(Math.round(Number(v) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const fmtPct = (v) => `${(Number(v) || 0).toFixed(1)}%`;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const round0 = (v) => Math.round(Number(v) || 0);
 
-    const TYPES = ['指数基金', '个股', '债券', '货币现金', '黄金', '其他'];
-    const TYPE_COLORS = { 指数基金: '#4e8cff', 个股: '#8f6bd6', 债券: '#2fbf71', 货币现金: '#e8a13c', 黄金: '#d4a017', 其他: '#9aa4b2' };
+    /* --------------------- R1 · 类型与权益敞口映射 --------------------- */
 
-    let holdings = []; // [{name, type, amt}]
+    const TYPES = ['指数基金', '混合型', '个股', '公司股', '债券', '货币现金', '黄金', '其他'];
+    const TYPE_COLORS = {
+      指数基金: '#4e8cff',
+      混合型: '#20a39e',
+      个股: '#8f6bd6',
+      公司股: '#a0522d',
+      债券: '#2fbf71',
+      货币现金: '#e8a13c',
+      黄金: '#d4a017',
+      其他: '#9aa4b2',
+    };
+    /** 类型 → 默认权益敞口%（确认表/持仓表逐条可改） */
+    const DEFAULT_EQ = { 指数基金: 100, 个股: 100, 公司股: 100, 混合型: 50, 债券: 10, 货币现金: 0, 黄金: 0, 其他: 0 };
+
+    /** ESOP 判定：类型=公司股，或名称含「华为虚拟股/ESOP」 */
+    const isEsopHolding = (h) => h.type === '公司股' || /华为虚拟股|ESOP/i.test(String(h.name ?? ''));
+
+    /* --------------------- R3 · 本地词典＋场内代码前缀 --------------------- */
+
+    /**
+     * 类型自动建议词典（页面内常量表，可持续扩充）：按序匹配，先命中先用。
+     * 场内代码前缀兜底：5x/1x 开头→场内基金/ETF；60/3/48/8 开头→沪深 A 股/北交所。
+     * 全部未命中 → 默认「混合型 50%」且 guessed=false（确认表标注待确认）。
+     */
+    const TYPE_HINTS = [
+      { re: /华为虚拟股|ESOP/i, type: '公司股' },
+      { re: /货币|现金|余额|活期|存款|零钱/, type: '货币现金' },
+      { re: /债/, type: '债券' },
+      { re: /红利|指数|ETF|LOF|沪深300|中证|创业板|纳斯达克|标普|医药|消费|科技/i, type: '指数基金' },
+      { re: /混合|灵活|精选|平衡/, type: '混合型' },
+      { re: /黄金|贵金属/, type: '黄金' },
+    ];
+    /** @returns {{type: string, eq: number, guessed: boolean}} */
+    function suggestType(name, code) {
+      const s = String(name ?? '');
+      const c = String(code ?? '').trim();
+      for (const h of TYPE_HINTS) {
+        if (h.re.test(s)) return { type: h.type, eq: DEFAULT_EQ[h.type], guessed: true };
+      }
+      if (/^\d{5,6}$/.test(c)) {
+        if (/^[15]/.test(c)) return { type: '指数基金', eq: DEFAULT_EQ['指数基金'], guessed: true };
+        if (/^[60348]/.test(c)) return { type: '个股', eq: DEFAULT_EQ['个股'], guessed: true };
+      }
+      return { type: '混合型', eq: DEFAULT_EQ['混合型'], guessed: false };
+    }
+
+    /* ------------------------------ 状态 ------------------------------ */
+
+    let holdings = []; // [{name, type, amt, eq}]  eq=权益敞口%（0~100）
+    let _txnsDoc = null; // {rules, txns}（来自 txns 实体，与 core.computeIncome12m 同源）
+    let _planDoc = null; // {invest, ...}（来自 plan 实体）
+    const PARAM_DEFAULTS = { m: 0, i: 0, mAuto: true, iAuto: true, eqT: 60, eqB: 10, sbT: 30, cT: 10, cB: 5 };
+    let params = { ...PARAM_DEFAULTS };
 
     /* ------------------------------ 持仓录入表单 ------------------------------ */
 
@@ -67,9 +138,10 @@
       };
       const name = el('input');
       name.type = 'text';
-      name.placeholder = '如：沪深300指数';
+      name.placeholder = '如：沪深300指数 / 华为虚拟股';
       const type = el('select');
       type.innerHTML = TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
+      type.setAttribute('aria-label', '持仓类型');
       const amt = el('input');
       amt.type = 'number';
       amt.min = '0';
@@ -82,12 +154,12 @@
         const a = Number(amt.value);
         if (!n) { alert('请填写持仓名称。'); return; }
         if (!Number.isFinite(a) || a <= 0) { alert('金额请填写大于 0 的数字。'); return; }
-        holdings = [...holdings, { name: n, type: type.value, amt: a }];
+        holdings = [...holdings, { name: n, type: type.value, amt: a, eq: DEFAULT_EQ[type.value] ?? 0 }];
         name.value = '';
         amt.value = '';
         await persist();
       });
-      row.append(mk('持仓名称', name), mk('类型', type), mk('金额（元）', amt), btnAdd);
+      row.append(mk('持仓名称', name), mk('类型（默认权益敞口见体检说明）', type), mk('金额（元）', amt), btnAdd);
       mount.appendChild(row);
 
       const btnClear = el('button', 'btn btn-danger', '🗑 清空持仓');
@@ -102,126 +174,1485 @@
       mount.appendChild(btnClear);
     }
 
+    /** 归一化持仓：补 eq（老数据无 eq → 按类型默认敞口）、clamp 0~100 */
+    function normalizeHolding(h) {
+      const name = String(h?.name ?? '').trim();
+      const type = TYPES.includes(h?.type) ? h.type : '其他';
+      const amt = Number(h?.amt);
+      const eq = Number.isFinite(Number(h?.eq)) ? clamp(Math.round(Number(h.eq)), 0, 100) : (DEFAULT_EQ[type] ?? 0);
+      return { name, type, amt: Number.isFinite(amt) && amt > 0 ? amt : 0, eq };
+    }
+
     async function persist() {
-      await commitChange('pf_holdings', { items: holdings }); // BUG-004①：先 await commitChange
+      await commitChange('pf_holdings', { items: holdings, params }); // BUG-004①：先 await commitChange
       flushOutbox().catch(() => { /* BUG-007：离线静默，留待 online/下次 flush */ }); // 再 flush
       renderAll();
     }
 
-    /* ------------------------------ 四维红绿灯 ------------------------------ */
+    /* --------------------------- T7 · 截图导入持仓 --------------------------- */
 
-    /** @returns {{h:string, d:string}[]} picgrid 用 */
-    function evaluate(items) {
-      const total = items.reduce((s, x) => s + x.amt, 0) || 1;
-      const pct = (v) => (v / total) * 100;
-      const top = Math.max(...items.map((x) => x.amt));
-      const kinds = new Set(items.map((x) => x.type));
-      const cash = items.filter((x) => x.type === '货币现金').reduce((s, x) => s + x.amt, 0);
-      const stock = items.filter((x) => x.type === '个股').reduce((s, x) => s + x.amt, 0);
-
-      const d1 = pct(top);
-      const l1 = d1 <= 30 ? '🟢' : d1 <= 50 ? '🟡' : '🔴';
-      const n = items.length;
-      const l2 = n >= 5 ? '🟢' : n >= 3 ? '🟡' : '🔴';
-      const d3 = pct(cash);
-      const l3 = d3 >= 10 ? '🟢' : d3 >= 5 ? '🟡' : '🔴';
-      const d4 = pct(stock);
-      const l4 = d4 <= 40 ? '🟢' : d4 <= 60 ? '🟡' : '🔴';
-
-      return [
-        { h: `${l1} 集中度`, d: `最大单一持仓 ${d1.toFixed(1)}%（≤30% 达标）` },
-        { h: `${l2} 分散度`, d: `${n} 个持仓（≥5 个达标）` },
-        { h: `${l3} 现金覆盖`, d: `现金类占比 ${d3.toFixed(1)}%（≥10% 达标）` },
-        { h: `${l4} 个股占比`, d: `个股 ${d4.toFixed(1)}%（≤40% 达标）` },
-      ];
+    /**
+     * multipart 专用 fetch：与 sync.js apiFetch 同契约（X-Auth-Token、
+     * {error:{code,message}} 解析、NETWORK 归一）。不直接复用 apiFetch 的原因：
+     * 其固定 Content-Type: application/json 会破坏 multipart boundary（FormData
+     * 须交由浏览器自动生成），而 sync.js 不在本批可改文件边界内。
+     * @param {string} path 以 / 开头的 API 路径
+     * @param {FormData} formData multipart 表单（字段 image）
+     * @returns {Promise<any>} 服务端 JSON
+     */
+    async function apiForm(path, formData) {
+      const token = getAuthToken();
+      let res;
+      try {
+        res = await fetch(path, {
+          method: 'POST',
+          headers: token ? { 'X-Auth-Token': token } : {},
+          body: formData,
+        });
+      } catch (e) {
+        throw Object.assign(new Error('网络不可达：' + (e?.message ?? e)), { code: 'NETWORK', status: 0 });
+      }
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        const err = json?.error ?? { code: res.status, message: res.statusText };
+        throw Object.assign(new Error(err.message ?? 'API 错误'), { code: err.code, status: res.status });
+      }
+      return json;
     }
 
-    function renderResult(mount) {
-      mount.textContent = '';
-      if (!holdings.length) {
-        mount.appendChild(el('div', 'empty',
-          '还没有持仓记录——在上方填入持仓后自动生成四维红绿灯体检报告；数据仅存本机。'));
+    /** File → dataURL（离线队列存 IndexedDB 用） */
+    const fileToDataUrl = (file) =>
+      new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result));
+        r.onerror = () => reject(r.error ?? new Error('读取文件失败'));
+        r.readAsDataURL(file);
+      });
+
+    /** dataURL → Blob（队列补识别时还原为可上传体） */
+    function dataUrlToBlob(dataUrl) {
+      const [meta, b64] = String(dataUrl).split(',');
+      const mime = /^data:([^;]+)/.exec(meta)?.[1] ?? 'image/jpeg';
+      const bin = atob(b64 ?? '');
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+
+    /**
+     * 归一化识别结果 → 候选行：金额 = market，缺失回退 cost（契约口径）；
+     * 类型/权益% 用本地词典建议（R3），识别不出默认混合 50% 并标注待确认。
+     * @param {any} rawRows 服务端 {rows:[...]}
+     * @returns {{name: string, code: string, type: string, eq: number, guessed: boolean, amt: number}[]}
+     */
+    function normalizeRows(rawRows) {
+      const out = [];
+      for (const r of Array.isArray(rawRows) ? rawRows : []) {
+        if (!r || typeof r !== 'object') continue;
+        const name = String(r.name ?? '').trim();
+        if (!name) continue;
+        const market = Number(r.market);
+        const cost = Number(r.cost);
+        const amt = Number.isFinite(market) && market > 0 ? market : Number.isFinite(cost) && cost > 0 ? cost : NaN;
+        const sug = suggestType(name, r.code);
+        out.push({ name, code: r.code == null ? '' : String(r.code).trim(), type: sug.type, eq: sug.eq, guessed: sug.guessed, amt });
+      }
+      return out;
+    }
+
+    /* ----- AI 可用性探测：空 POST /api/ai/vision（不带图片，不产生出云流量）----- */
+
+    /** null=未探测（入口隐藏）/ true=可用（展示入口）/ false=未启用（保持隐藏） */
+    let aiAvailable = null;
+    let aiProbing = null;
+
+    /** 后端先读 config 再校验图片字段：501 ai_disabled=未启用；400 validation_error 缺图=已启用 */
+    function probeAiVision() {
+      if (aiAvailable !== null) return Promise.resolve(aiAvailable);
+      if (aiProbing) return aiProbing;
+      aiProbing = apiForm('/api/ai/vision', new FormData())
+        .then(() => {
+          aiAvailable = true;
+        })
+        .catch((e) => {
+          // 只有「缺图校验错误」能证明 AI 已启用（enabled 先判，缺件 400 validation_error）；
+          // 其余（401 unauthorized 未配 token / 404 旧后端无此端点 / 502 上游错）一律视为
+          // 不可用并保持入口隐藏——「可用才展示」承诺不被未配置环境破坏；NETWORK（后端
+          // 不可达）维持 null（未知），择机再探测。
+          aiAvailable = e.code === 'NETWORK' ? null : e.code === 'validation_error';
+        })
+        .finally(() => {
+          aiProbing = null;
+          syncAiOption();
+        });
+      return aiProbing;
+    }
+
+    /** AI 入口默认隐藏：仅探测到可用时展示；若翻转时 AI 选中态还在则回退本地 */
+    function syncAiOption() {
+      const wrap = document.getElementById('ocr-ai-opt');
+      if (!wrap) return;
+      wrap.hidden = aiAvailable !== true;
+      if (wrap.hidden) {
+        const aiRadio = wrap.querySelector('input[type="radio"]');
+        if (aiRadio?.checked) {
+          const localRadio = wrap.parentElement?.querySelector('input[name="ocr-engine"][value="local"]');
+          if (localRadio) localRadio.checked = true;
+        }
+      }
+    }
+
+    /* ------------------------------ 识别与队列 ------------------------------ */
+
+    /** 当前选中的截图文件；确认表打开标记；AI 探测外的串行化管道 */
+    let ocrFile = null;
+    let ocrPreviewUrl = null;
+    let confirmOpen = false;
+    let _queueRunning = false;
+    let _ocrPipe = Promise.resolve();
+    /** 串行化：手动识别与队列补识别共用一条 promise 链，确认表不交叠 */
+    function enqueueOcrTask(fn) {
+      const run = _ocrPipe.then(fn);
+      _ocrPipe = run.then(
+        () => {},
+        () => {},
+      );
+      return run;
+    }
+
+    /** 统一发送：engine 决定端点；返回服务端 JSON（rows/rawLines/model） */
+    async function sendOcr(fileLike, engine) {
+      const fd = new FormData();
+      const ext = String(fileLike.type || 'image/jpeg').split('/')[1] || 'jpg';
+      fd.append('image', fileLike, fileLike.name || `screenshot.${ext}`);
+      return apiForm(engine === 'ai' ? '/api/ai/vision' : '/api/portfolio/ocr', fd);
+    }
+
+    function setStatus(text, busy = false) {
+      const s = document.getElementById('ocr-status');
+      if (s) {
+        s.textContent = text || '';
+        s.dataset.busy = busy ? '1' : '';
+      }
+      const btnStart = document.getElementById('ocr-start');
+      if (btnStart) btnStart.disabled = !!busy;
+    }
+
+    function showMsg(kind, text) {
+      const box = document.getElementById('ocr-msg');
+      if (!box) return;
+      box.textContent = '';
+      const c = el('div', kind ? `callout ${kind}` : 'callout');
+      c.textContent = text;
+      box.appendChild(c);
+    }
+
+    /** 手动流程：选好的截图 → 确认弹窗（仅 AI）→ 识别 → 候选确认表；网络失败入队 */
+    async function recognizeFile(file, engine) {
+      const useEngine = engine === 'ai' && aiAvailable === true ? 'ai' : 'local';
+      if (useEngine === 'ai') {
+        if (!confirm('「AI 识别」会把这张截图发送至智谱云（GLM 视觉模型）。确认发送？')) {
+          showMsg('warn', '已取消：截图未发送。');
+          return;
+        }
+      }
+      setStatus(useEngine === 'ai' ? 'AI 识别中…' : '本地识别中…', true);
+      try {
+        const res = await sendOcr(file, useEngine);
+        const rows = normalizeRows(res?.rows);
+        if (!rows.length) {
+          showMsg('warn', '未识别到持仓行：请换更清晰的持仓页截图，或改用另一种识别方式。');
+          return;
+        }
+        showMsg('ok', `识别到 ${rows.length} 行候选（${useEngine === 'ai' ? 'AI' : '本地'}识别）——请在下方确认表逐行核对，确认后才会导入。`);
+        setStatus(''); // 识别已结束：确认表交互期间恢复按钮可用
+        await openConfirmTable(rows, { rawLines: Array.isArray(res?.rawLines) ? res.rawLines : [] });
+      } catch (e) {
+        if (e.code === 'NETWORK') {
+          await queuePending(file, useEngine);
+          return;
+        }
+        if (useEngine === 'ai' && e.code === 'ai_disabled') {
+          aiAvailable = false;
+          syncAiOption();
+          showMsg('warn', 'AI 识别未启用（backend/data/config.json → ai.vision.enabled + apiKey），已隐藏 AI 入口；可改用本地识别。');
+          return;
+        }
+        if (e.code === 'ocr_not_installed') {
+          showMsg(
+            'danger',
+            '后端未安装本地识别组件：pip install rapidocr-onnxruntime python-multipart（装完重启后端生效）。' +
+              (aiAvailable === true ? '也可改用 AI 识别（截图将发送至智谱云）。' : ''),
+          );
+          return;
+        }
+        showMsg('danger', `识别失败：${e?.message ?? e}`);
+      } finally {
+        setStatus('');
+      }
+    }
+
+    /** 离线入队：截图转 dataURL 存 pending_ocr（纯本机，不参与同步） */
+    async function queuePending(file, engine) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        await pendingOcrPut({
+          id: `po_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+          dataUrl,
+          engine: engine === 'ai' ? 'ai' : 'local',
+          createdAt: Date.now(),
+          attempts: 0,
+        });
+        refreshQueueBadge();
+        showMsg('warn', '网络不可达：截图已存入本机待识别队列（IndexedDB pending_ocr，不出机），恢复联网后自动补识别并弹确认表。');
+      } catch (e) {
+        showMsg('danger', `存入待识别队列失败：${e?.message ?? e}（请联网后重试）。`);
+      }
+    }
+
+    /**
+     * 队列补识别（online 事件 / 页面启动时在线 / 手动「立即补识别」触发）。
+     * 返回值：'done'=该条已处理（确认表已弹/已移除）；'retry'=换引擎重试同条；
+     * 'keep'=用户暂缓；'stop'=后端不可达或组件缺失，整队暂停。
+     */
+    async function recognizePendingItem(item) {
+      let engine = item.engine === 'ai' ? 'ai' : 'local';
+      if (engine === 'ai') {
+        if (aiAvailable !== true) await probeAiVision();
+        if (aiAvailable === false) engine = 'local'; // AI 已停用：转本地补识别（不出云）
+        else if (aiAvailable === true) {
+          if (!confirm('待识别队列中有 AI 识别任务：截图将发送至智谱云，确认补识别？')) return 'keep';
+        } else return 'stop';
+      }
+      let blob;
+      try {
+        blob = dataUrlToBlob(item.dataUrl);
+      } catch {
+        await pendingOcrDelete(item.id); // 数据损坏无法还原：丢弃并继续
+        return 'done';
+      }
+      setStatus(`补识别队列截图（${engine === 'ai' ? 'AI' : '本地'}）…`, true);
+      try {
+        const res = await sendOcr(blob, engine);
+        const rows = normalizeRows(res?.rows);
+        if (!rows.length) {
+          await pendingOcrDelete(item.id); // 无候选即无可确认：移除并提示
+          refreshQueueBadge();
+          showMsg('warn', '一张待识别截图未识别出持仓行，已从队列移除。');
+          return 'done';
+        }
+        showMsg('ok', `离线队列补识别成功（${engine === 'ai' ? 'AI' : '本地'}）：识别到 ${rows.length} 行候选，请核对确认表。`);
+        setStatus('');
+        await openConfirmTable(rows, { pendingId: item.id, sourceLabel: '离线队列补识别' });
+        return 'done';
+      } catch (e) {
+        if (e.code === 'NETWORK') return 'stop'; // 仍不可达：整队保留，等下次 online
+        if (engine === 'ai' && e.code === 'ai_disabled') {
+          aiAvailable = false;
+          syncAiOption();
+          await pendingOcrPut({ ...item, engine: 'local', lastError: 'ai_disabled → 转本地' });
+          return 'retry'; // 同一条换本地引擎重跑
+        }
+        if (e.code === 'ocr_not_installed') {
+          await pendingOcrPut({ ...item, attempts: (item.attempts ?? 0) + 1, lastError: 'ocr_not_installed' });
+          refreshQueueBadge();
+          showMsg('danger', '待识别队列暂无法处理：后端未安装识别组件（pip install rapidocr-onnxruntime python-multipart），装完重启后端后可点「立即补识别」。');
+          return 'stop';
+        }
+        await pendingOcrPut({ ...item, attempts: (item.attempts ?? 0) + 1, lastError: String(e?.message ?? e) });
+        refreshQueueBadge();
+        showMsg('warn', `一条待识别截图补识别失败：${e?.message ?? e}（已保留队列，可稍后重试）。`);
+        return 'continue';
+      } finally {
+        setStatus('');
+      }
+    }
+
+    /** online 自动补识别：逐条串行（与手动识别共用管道，确认表不交叠） */
+    async function processPendingOcr() {
+      if (_queueRunning) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      _queueRunning = true;
+      try {
+        const items = await pendingOcrList();
+        for (const item of items) {
+          let target = item;
+          for (let pass = 0; pass < 2; pass++) {
+            const verdict = await enqueueOcrTask(() => recognizePendingItem(target));
+            if (verdict === 'retry') {
+              const cur = await pendingOcrGet(target.id).catch(() => null);
+              if (cur) {
+                target = cur;
+                continue;
+              }
+            }
+            if (verdict === 'stop') return;
+            break;
+          }
+        }
+      } finally {
+        _queueRunning = false;
+      }
+    }
+
+    /** 待识别队列徽标：数量 + 手动「立即补识别」/「清空队列」 */
+    async function refreshQueueBadge() {
+      const line = document.getElementById('ocr-queue-line');
+      if (!line) return;
+      const items = await pendingOcrList().catch(() => []);
+      line.textContent = '';
+      if (!items.length) {
+        line.hidden = true;
         return;
       }
-      const total = holdings.reduce((s, x) => s + x.amt, 0);
+      line.hidden = false;
+      line.append(`待识别队列：${items.length} 张截图。`);
+      const btnRun = el('button', 'btn', '立即补识别');
+      btnRun.type = 'button';
+      btnRun.addEventListener('click', () => {
+        processPendingOcr();
+      });
+      const btnClearQ = el('button', 'btn btn-danger', '清空队列');
+      btnClearQ.type = 'button';
+      btnClearQ.addEventListener('click', async () => {
+        if (!confirm(`清空待识别队列中的 ${items.length} 张截图（不可恢复）？`)) return;
+        for (const it of items) await pendingOcrDelete(it.id).catch(() => {});
+        refreshQueueBadge();
+      });
+      line.append(' ', btnRun, ' ', btnClearQ);
+    }
 
-      const lights = el('div', null);
-      renderBlocks(lights, [{ t: 'picgrid', items: evaluate(holdings) }]);
-      mount.appendChild(lights);
+    /* ------------------------------ 候选确认表 ------------------------------ */
 
-      const dist = el('div', null);
-      renderBlocks(dist, [{
-        t: 'distrows',
-        rows: TYPES
-          .map((t) => ({ name: t, amt: holdings.filter((x) => x.type === t).reduce((s, x) => s + x.amt, 0) }))
-          .filter((r) => r.amt > 0)
-          .map((r) => ({ name: r.name, w: Math.round((r.amt / total) * 100), color: TYPE_COLORS[r.name], pct: ((r.amt / total) * 100).toFixed(1) + '%' })),
-      }]);
-      mount.appendChild(dist);
+    /**
+     * 候选确认表（绝不静默导入）：每行可勾选、内联修正名称/类型/权益%/金额；
+     * 「确认导入选中项」→ 追加（跳过完全重复）或替换 pf_holdings（commitChange 链路）。
+     * T9：新增「权益 %」列（默认按类型词典建议，逐条可改）；改类型即按新类型
+     * 重置权益默认敞口；词典未识别的行标注「待确认」徽标，人工改过即撤标。
+     * @param {{name: string, code: string, type: string, eq: number, guessed: boolean, amt: number}[]} rows
+     * @param {{pendingId?: string, sourceLabel?: string, rawLines?: string[]}} [opts]
+     * @returns {Promise<{imported: number, discarded?: boolean}>} 确认表处理完毕（含放弃）
+     */
+    function openConfirmTable(rows, { pendingId = null, sourceLabel = '', rawLines = [] } = {}) {
+      return new Promise((resolve) => {
+        const area = document.getElementById('ocr-confirm-area');
+        if (!area) {
+          resolve({ imported: 0, discarded: true });
+          return;
+        }
+        area.textContent = '';
+        confirmOpen = true;
 
-      const wrap = el('div', 'table-wrap');
-      const table = el('table', 'data-table');
-      table.innerHTML = '<thead><tr><th>持仓</th><th>类型</th><th>金额(元)</th><th>占比</th><th></th></tr></thead>';
-      const tbody = el('tbody');
-      [...holdings]
-        .sort((a, b) => b.amt - a.amt)
-        .forEach((h) => {
+        /** @type {{name: string, code: string, type: string, eq: number, guessed: boolean, amt: number, checked: boolean}[]} */
+        const state = rows.map((r) => ({
+          ...r,
+          checked: Number.isFinite(r.amt) && r.amt > 0 && !!r.name.trim(), // 金额缺失默认不勾，修正后可勾
+        }));
+        const validChecked = () => state.filter((r) => r.checked && r.name.trim() && Number(r.amt) > 0).length;
+
+        area.appendChild(
+          el(
+            'p',
+            'strong',
+            `${sourceLabel ? sourceLabel + ' · ' : ''}候选确认表（${state.length} 行）：金额优先取「市值」，缺失取「成本」；类型/权益% 为词典建议，标注「待确认」的行请重点核对；逐行核对后确认导入，绝不静默写入。`,
+          ),
+        );
+
+        const wrap = el('div', 'table-wrap');
+        const table = el('table', 'data-table ocr-table');
+        table.innerHTML = '<thead><tr><th><span class="hint">导入</span></th><th>名称</th><th>类型</th><th>权益 %</th><th>金额（元）</th></tr></thead>';
+        const tbody = el('tbody');
+        state.forEach((row, i) => {
           const tr = el('tr');
-          tr.innerHTML =
-            `<td>${h.name.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td><td>${h.type}</td>` +
-            `<td class="num">${fmtInt(h.amt)}</td><td class="num">${((h.amt / total) * 100).toFixed(1)}%</td>`;
-          const td = el('td');
-          const btn = el('button', 'btn', '删除');
-          btn.type = 'button';
-          btn.addEventListener('click', async () => {
-            if (!confirm(`删除持仓「${h.name}」？`)) return;
-            holdings = holdings.filter((x) => x !== h && !(x.name === h.name && x.amt === h.amt && x.type === h.type));
-            await persist();
+
+          const tdCheck = el('td');
+          const lab = el('label', 'ocr-check');
+          const cb = el('input');
+          cb.type = 'checkbox';
+          cb.checked = row.checked;
+          cb.setAttribute('aria-label', `导入第 ${i + 1} 行 ${row.name}`);
+          cb.addEventListener('change', () => {
+            row.checked = cb.checked;
+            renderCount();
           });
-          td.appendChild(btn);
-          tr.appendChild(td);
+          lab.appendChild(cb);
+          tdCheck.appendChild(lab);
+          tr.appendChild(tdCheck);
+
+          const tdName = el('td');
+          const nameInput = el('input');
+          nameInput.type = 'text';
+          nameInput.value = row.name;
+          nameInput.setAttribute('aria-label', `第 ${i + 1} 行名称`);
+          nameInput.addEventListener('input', () => {
+            row.name = nameInput.value;
+            renderCount();
+          });
+          tdName.appendChild(nameInput);
+          if (row.code) {
+            const codeLine = el('div', 'hint');
+            codeLine.textContent = `代码 ${row.code}`;
+            tdName.appendChild(codeLine);
+          }
+          const todo = row.guessed ? null : el('span', 'pf-todo', '待确认');
+          if (todo) {
+            todo.title = '词典未能识别类型：已默认按「混合型 50%」计入，请人工核对类型与权益%。';
+            tdName.appendChild(todo);
+          }
+          tr.appendChild(tdName);
+
+          const tdType = el('td');
+          const sel = el('select');
+          sel.innerHTML = TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
+          sel.value = TYPES.includes(row.type) ? row.type : '其他';
+          sel.setAttribute('aria-label', `第 ${i + 1} 行类型`);
+          sel.addEventListener('change', () => {
+            row.type = sel.value;
+            row.eq = DEFAULT_EQ[row.type] ?? 0; // 换类型 → 重置为该类型默认敞口
+            eqInput.value = String(row.eq);
+            markConfirmed();
+          });
+          tdType.appendChild(sel);
+          tr.appendChild(tdType);
+
+          const tdEq = el('td');
+          const eqInput = el('input');
+          eqInput.type = 'number';
+          eqInput.min = '0';
+          eqInput.max = '100';
+          eqInput.step = '5';
+          eqInput.placeholder = '权益%';
+          eqInput.value = String(clamp(Math.round(Number(row.eq) || 0), 0, 100));
+          eqInput.setAttribute('aria-label', `第 ${i + 1} 行权益比例（%）`);
+          eqInput.addEventListener('input', () => {
+            row.eq = clamp(Number(eqInput.value) || 0, 0, 100);
+            markConfirmed();
+          });
+          tdEq.appendChild(eqInput);
+          tr.appendChild(tdEq);
+
+          const tdAmt = el('td');
+          const amtInput = el('input');
+          amtInput.type = 'number';
+          amtInput.min = '0';
+          amtInput.step = '0.01';
+          amtInput.placeholder = '金额';
+          amtInput.value = Number.isFinite(row.amt) ? String(row.amt) : '';
+          amtInput.setAttribute('aria-label', `第 ${i + 1} 行金额`);
+          if (!Number.isFinite(row.amt)) amtInput.classList.add('ocr-missing');
+          amtInput.addEventListener('input', () => {
+            row.amt = Number(amtInput.value);
+            amtInput.classList.toggle('ocr-missing', !(Number(amtInput.value) > 0));
+            renderCount();
+          });
+          tdAmt.appendChild(amtInput);
+          tr.appendChild(tdAmt);
+
+          /** 人工改过类型/权益即撤「待确认」标 */
+          function markConfirmed() {
+            row.guessed = true;
+            if (todo) todo.remove();
+          }
+
           tbody.appendChild(tr);
         });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        area.appendChild(wrap);
+
+        const actions = el('div', 'ocr-actions');
+        const labMode = el('label', null, '<span>导入方式</span>');
+        const modeSel = el('select');
+        modeSel.innerHTML = '<option value="append">追加到现有持仓</option><option value="replace">替换全部持仓</option>';
+        modeSel.setAttribute('aria-label', '导入方式');
+        labMode.appendChild(modeSel);
+        actions.appendChild(labMode);
+
+        const btnOk = el('button', 'btn btn-primary', '确认导入选中项');
+        btnOk.type = 'button';
+        const btnDiscard = el('button', 'btn', '放弃');
+        btnDiscard.type = 'button';
+        actions.append(btnOk, btnDiscard);
+        area.appendChild(actions);
+
+        const renderCount = () => {
+          btnOk.textContent = `确认导入选中项（${validChecked()}）`;
+        };
+        renderCount();
+
+        if (Array.isArray(rawLines) && rawLines.length) {
+          const det = el('details', 'details-block');
+          det.appendChild(el('summary', null, `识别原文（${rawLines.length} 行，供人工比对）`));
+          const pre = el('pre', 'ocr-raw');
+          pre.textContent = rawLines.join('\n');
+          det.appendChild(pre);
+          area.appendChild(det);
+        }
+
+        const finish = (result) => {
+          area.textContent = '';
+          confirmOpen = false;
+          resolve(result);
+          if (pendingId) {
+            pendingOcrDelete(pendingId)
+              .then(() => refreshQueueBadge())
+              .catch(() => {});
+          }
+        };
+
+        btnOk.addEventListener('click', async () => {
+          const invalid = state.filter((r) => r.checked && !(r.name.trim() && Number(r.amt) > 0)).length;
+          const picked = state
+            .filter((r) => r.checked && r.name.trim() && Number(r.amt) > 0)
+            .map((r) => ({
+              name: r.name.trim(),
+              type: TYPES.includes(r.type) ? r.type : '其他',
+              amt: Number(r.amt),
+              eq: Number.isFinite(Number(r.eq)) ? clamp(Math.round(Number(r.eq)), 0, 100) : (DEFAULT_EQ[r.type] ?? 0),
+            }));
+          if (!picked.length) {
+            alert(invalid ? '勾选的行名称/金额无效，请先内联修正。' : '请至少勾选一行有效候选。');
+            return;
+          }
+          if (modeSel.value === 'replace') {
+            if (!confirm(`替换模式：现有 ${holdings.length} 项持仓将被这 ${picked.length} 项覆盖，确认？`)) return;
+            holdings = picked;
+            alert(`已替换为 ${picked.length} 项持仓。`);
+          } else {
+            const key = (h) => `${h.name}|${h.type}|${h.amt}|${h.eq}`;
+            const existing = new Set(holdings.map(key));
+            const fresh = picked.filter((h) => !existing.has(key(h)));
+            holdings = [...holdings, ...fresh];
+            alert(
+              `已导入 ${fresh.length} 项${picked.length - fresh.length ? `（跳过 ${picked.length - fresh.length} 项与现有完全重复）` : ''}` +
+                `${invalid ? `；另有 ${invalid} 项勾选但名称/金额无效，未导入` : ''}。`,
+            );
+          }
+          try {
+            await persist();
+          } catch (e) {
+            alert(`导入已生效（内存），但本机保存失败：${e?.message ?? e}`);
+          }
+          finish({ imported: picked.length }); // 无论保存成败都收口确认表，避免管道卡死
+        });
+
+        btnDiscard.addEventListener('click', () => {
+          if (!confirm('放弃本次候选，不导入？')) return;
+          finish({ imported: 0, discarded: true });
+        });
+      });
+    }
+
+    /* ------------------------------ 截图导入 UI ------------------------------ */
+
+    function buildOcr(mount) {
+      mount.textContent = '';
+      const card = el('div', 'card ocr-panel');
+      card.appendChild(el('h3', null, '📷 截图导入持仓'));
+      card.appendChild(
+        el('p', 'hint', '上传券商/基金 App 的持仓页截图：本地识别（RapidOCR）数据不出机；AI 识别默认隐藏，可用时才出现且每次发送前弹窗确认。识别结果先入候选确认表（类型/权益% 为词典自动建议，可逐条修改），核对后才写入持仓。'),
+      );
+
+      const upload = el('div', 'ocr-upload');
+      const inputPick = el('input');
+      inputPick.type = 'file';
+      inputPick.accept = 'image/*';
+      inputPick.id = 'ocr-file-pick';
+      inputPick.hidden = true;
+      const inputShoot = el('input');
+      inputShoot.type = 'file';
+      inputShoot.accept = 'image/*';
+      inputShoot.id = 'ocr-file-shoot';
+      inputShoot.setAttribute('capture', 'environment'); // 手机直接调起后置相机
+      inputShoot.hidden = true;
+      const btnPick = el('button', 'btn', '🖼 选择图片');
+      btnPick.type = 'button';
+      btnPick.addEventListener('click', () => inputPick.click());
+      const btnShoot = el('button', 'btn', '📷 拍照识别');
+      btnShoot.type = 'button';
+      btnShoot.addEventListener('click', () => inputShoot.click());
+
+      const preview = el('div', 'ocr-preview');
+      preview.hidden = true;
+      const thumb = el('img');
+      thumb.alt = '截图预览';
+      const meta = el('span', 'ocr-file-meta');
+
+      const pick = (file) => {
+        if (ocrPreviewUrl) URL.revokeObjectURL(ocrPreviewUrl);
+        ocrFile = file ?? null;
+        document.getElementById('ocr-msg').textContent = '';
+        if (!ocrFile) return;
+        ocrPreviewUrl = URL.createObjectURL(ocrFile);
+        thumb.src = ocrPreviewUrl;
+        meta.textContent = `${ocrFile.name || '截图'} · ${(ocrFile.size / 1024).toFixed(0)} KB`;
+        preview.hidden = false;
+        engineRow.hidden = false;
+        probeAiVision(); // 择机探测 AI 可用性（空探测不出云）
+      };
+      const onPick = () => {
+        if (inputPick.files?.[0]) pick(inputPick.files[0]);
+        inputPick.value = '';
+      };
+      const onShoot = () => {
+        if (inputShoot.files?.[0]) pick(inputShoot.files[0]);
+        inputShoot.value = '';
+      };
+      inputPick.addEventListener('change', onPick);
+      inputShoot.addEventListener('change', onShoot);
+
+      const previewWrap = el('div', 'ocr-preview-wrap');
+      previewWrap.append(btnPick, btnShoot, preview);
+      preview.appendChild(thumb);
+      preview.appendChild(meta);
+      upload.append(inputPick, inputShoot, previewWrap);
+
+      const engineRow = el('div', 'ocr-engine');
+      engineRow.hidden = true;
+      const labLocal = el('label');
+      const radioLocal = el('input');
+      radioLocal.type = 'radio';
+      radioLocal.name = 'ocr-engine';
+      radioLocal.value = 'local';
+      radioLocal.checked = true;
+      labLocal.append(radioLocal, document.createTextNode('本地识别（默认 · 数据不出机）'));
+      const labAi = el('label');
+      labAi.id = 'ocr-ai-opt';
+      labAi.hidden = true; // AI 入口默认隐藏，探测可用后才展示
+      const radioAi = el('input');
+      radioAi.type = 'radio';
+      radioAi.name = 'ocr-engine';
+      radioAi.value = 'ai';
+      labAi.append(radioAi, document.createTextNode('AI 识别（GLM 视觉 · 截图出云，发送前确认）'));
+      const btnStart = el('button', 'btn btn-primary', '开始识别');
+      btnStart.type = 'button';
+      btnStart.id = 'ocr-start';
+      btnStart.addEventListener('click', () => {
+        if (!ocrFile) {
+          alert('请先选择截图。');
+          return;
+        }
+        if (confirmOpen) {
+          alert('请先处理当前候选确认表（确认导入或放弃）后再识别下一张。');
+          return;
+        }
+        const engine = engineRow.querySelector('input[name="ocr-engine"]:checked')?.value === 'ai' ? 'ai' : 'local';
+        enqueueOcrTask(() => recognizeFile(ocrFile, engine)).catch(() => {});
+      });
+      const btnReset = el('button', 'btn', '重新选择');
+      btnReset.type = 'button';
+      btnReset.addEventListener('click', () => {
+        if (ocrPreviewUrl) URL.revokeObjectURL(ocrPreviewUrl);
+        ocrPreviewUrl = null;
+        ocrFile = null;
+        preview.hidden = true;
+        engineRow.hidden = true;
+        document.getElementById('ocr-msg').textContent = '';
+      });
+      engineRow.append(labLocal, labAi, btnStart, btnReset);
+
+      const status = el('div', 'status-line');
+      status.id = 'ocr-status';
+      const msg = el('div', 'ocr-msg');
+      msg.id = 'ocr-msg';
+      const confirmArea = el('div', 'ocr-confirm-area');
+      confirmArea.id = 'ocr-confirm-area';
+      const queueLine = el('p', 'hint ocr-queue-line');
+      queueLine.id = 'ocr-queue-line';
+      queueLine.hidden = true;
+
+      card.append(upload, engineRow, status, msg, confirmArea, queueLine);
+      mount.appendChild(card);
+    }
+
+    /* --------------------- R4 · 体检参数三件套 --------------------- */
+
+    /**
+     * 月生活支出 M 默认：流水 txns 实体（与 core.computeIncome12m 同源）近 12 个月
+     * 窗口内 D 类非跳过项月均——按有支出记录的月份平均（窗口口径与 incomeWindowOf
+     * 一致：[今日−12 月, 今日]）。
+     */
+    function computeMonthlySpend(txnsDoc) {
+      const txns = Array.isArray(txnsDoc?.txns) ? txnsDoc.txns : [];
+      const now = new Date();
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 12, now.getDate());
+      let sum = 0;
+      const months = new Set();
+      for (const t of txns) {
+        if (!t || t.dc !== 'D' || t.cat === 'skip') continue;
+        const d = new Date(String(t.d ?? '') + 'T00:00:00');
+        if (Number.isNaN(d.getTime()) || d < cutoff || d > now) continue;
+        const amt = Number(t.amt);
+        if (!(amt > 0)) continue;
+        sum += amt;
+        months.add(String(t.d).slice(0, 7));
+      }
+      return months.size ? sum / months.size : 0;
+    }
+
+    /** 每月定投 I 默认：计划页投资池（plan 实体的 invest） */
+    function computeInvestDefault(planDoc) {
+      const v = Number(planDoc?.invest);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    }
+
+    /** 覆盖式合并参数（老数据无 params 或缺字段 → 用默认补齐） */
+    function mergeParams(stored) {
+      const p = { ...PARAM_DEFAULTS, ...(stored && typeof stored === 'object' ? stored : {}) };
+      p.m = Math.max(0, round0(p.m));
+      p.i = Math.max(0, round0(p.i));
+      p.mAuto = p.mAuto !== false;
+      p.iAuto = p.iAuto !== false;
+      p.eqT = clamp(Math.round(Number(p.eqT) || 0), 0, 100);
+      p.sbT = clamp(Math.round(Number(p.sbT) || 0), 0, 100);
+      p.cT = clamp(Math.round(Number(p.cT) || 0), 0, 100);
+      p.eqB = clamp(Math.round(Number(p.eqB) || 0), 0, 50);
+      p.cB = clamp(Math.round(Number(p.cB) || 0), 0, 50);
+      return p;
+    }
+
+    /** 自动项按最新流水/计划重算（手动覆盖过的不动） */
+    function refreshAutoParams() {
+      if (params.mAuto) params.m = round0(computeMonthlySpend(_txnsDoc));
+      if (params.iAuto) params.i = round0(computeInvestDefault(_planDoc));
+    }
+
+    /** 参数卡只建一次（输入不重建，避免打字丢焦点）；值同步用 syncParamsUI */
+    function buildParams(mount) {
+      mount.textContent = '';
+      const card = el('div', 'card pf-params');
+      card.appendChild(el('h3', null, '🎛 体检参数（改动即时重算五灯）'));
+
+      const row1 = el('div', 'form-row');
+      const mkNum = (labelText, input, hintText) => {
+        const lab = el('label');
+        lab.appendChild(el('span', null, labelText));
+        lab.appendChild(input);
+        if (hintText) {
+          const h = el('span', 'hint', hintText);
+          lab.appendChild(h);
+        }
+        return lab;
+      };
+      const mInput = el('input');
+      mInput.type = 'number';
+      mInput.min = '0';
+      mInput.step = '100';
+      mInput.id = 'pf-m';
+      mInput.setAttribute('aria-label', '月生活支出 M（元/月）');
+      const iInput = el('input');
+      iInput.type = 'number';
+      iInput.min = '0';
+      iInput.step = '100';
+      iInput.id = 'pf-i';
+      iInput.setAttribute('aria-label', '每月定投 I（元/月）');
+      const btnM = el('button', 'btn', 'M 恢复自动');
+      btnM.type = 'button';
+      btnM.id = 'pf-m-auto';
+      btnM.title = '恢复为流水 D 类非跳过项月均';
+      const btnI = el('button', 'btn', 'I 恢复自动');
+      btnI.type = 'button';
+      btnI.id = 'pf-i-auto';
+      btnI.title = '恢复为计划页投资池（plan.invest）';
+      row1.append(
+        mkNum('月生活支出 M（元/月）', mInput, '自动＝近 12 个月流水 D 类非跳过项月均；手动输入即覆盖'),
+        btnM,
+        mkNum('每月定投 I（元/月）', iInput, '自动＝计划页投资池（plan.invest）；手动输入即覆盖'),
+        btnI,
+      );
+      card.appendChild(row1);
+
+      const row2 = el('div', 'form-row');
+      const mkTarget = (id, labelText, aria) => {
+        const input = el('input');
+        input.type = 'number';
+        input.min = '0';
+        input.max = '100';
+        input.step = '1';
+        input.id = id;
+        input.setAttribute('aria-label', aria);
+        return mkNum(labelText, input);
+      };
+      const mkBand = (id, labelText, aria) => {
+        const input = el('input');
+        input.type = 'number';
+        input.min = '0';
+        input.max = '50';
+        input.step = '1';
+        input.id = id;
+        input.setAttribute('aria-label', aria);
+        return mkNum(labelText, input);
+      };
+      row2.append(
+        mkTarget('pf-eq-t', '权益目标 %', '权益目标配比（%）'),
+        mkBand('pf-eq-b', '权益容差 ±%', '权益目标容差（±百分点）'),
+        mkTarget('pf-sb-t', '稳健目标 %', '稳健目标配比（%）'),
+        mkTarget('pf-c-t', '现金目标 %', '现金目标配比（%）'),
+        mkBand('pf-c-b', '现金容差 ±%', '现金目标容差（±百分点）'),
+      );
+      card.appendChild(row2);
+      card.appendChild(
+        el('p', 'hint', '目标配比默认 权益 60 / 稳健 30 / 现金 10；容差即灯的绿区半宽（权益默认 ±10、现金默认 ±5）。稳健＝组合−权益敞口−现金，不作单独灯，只进应急覆盖。'),
+      );
+      mount.appendChild(card);
+
+      /** 输入中：只重算上半屏（灯/总评/建议/构成），不重建表格不丢焦点；
+       * 逐字段比对——只有真的改了值才脱离该项自动（改 M 不影响 I 的自动联动）。 */
+      const PARAM_FIELDS = [
+        { id: 'pf-m', key: 'm', autoKey: 'mAuto', cl: (v) => Math.max(0, round0(v)) },
+        { id: 'pf-i', key: 'i', autoKey: 'iAuto', cl: (v) => Math.max(0, round0(v)) },
+        { id: 'pf-eq-t', key: 'eqT', cl: (v) => clamp(Math.round(v) || 0, 0, 100) },
+        { id: 'pf-eq-b', key: 'eqB', cl: (v) => clamp(Math.round(v) || 0, 0, 50) },
+        { id: 'pf-sb-t', key: 'sbT', cl: (v) => clamp(Math.round(v) || 0, 0, 100) },
+        { id: 'pf-c-t', key: 'cT', cl: (v) => clamp(Math.round(v) || 0, 0, 100) },
+        { id: 'pf-c-b', key: 'cB', cl: (v) => clamp(Math.round(v) || 0, 0, 50) },
+      ];
+      const onEdit = () => {
+        for (const f of PARAM_FIELDS) {
+          const v = f.cl(Number(document.getElementById(f.id).value) || 0);
+          if (v !== params[f.key]) {
+            params[f.key] = v;
+            if (f.autoKey) params[f.autoKey] = false; // 手动改动即脱离该项自动
+          }
+        }
+        renderTop();
+      };
+      for (const f of PARAM_FIELDS) {
+        document.getElementById(f.id).addEventListener('input', onEdit);
+        document.getElementById(f.id).addEventListener('change', () => {
+          persist().catch(() => {});
+        });
+      }
+      btnM.addEventListener('click', () => {
+        params.mAuto = true;
+        refreshAutoParams();
+        syncParamsUI();
+        renderTop();
+        persist().catch(() => {});
+      });
+      btnI.addEventListener('click', () => {
+        params.iAuto = true;
+        refreshAutoParams();
+        syncParamsUI();
+        renderTop();
+        persist().catch(() => {});
+      });
+    }
+
+    /** 把 params 当前值写回参数卡输入框 */
+    function syncParamsUI() {
+      const map = { 'pf-m': params.m, 'pf-i': params.i, 'pf-eq-t': params.eqT, 'pf-eq-b': params.eqB, 'pf-sb-t': params.sbT, 'pf-c-t': params.cT, 'pf-c-b': params.cB };
+      for (const [id, v] of Object.entries(map)) {
+        const n = document.getElementById(id);
+        if (n && document.activeElement !== n) n.value = String(v);
+      }
+    }
+
+    /* --------------------- R5 · 五灯计算引擎（敞口口径） --------------------- */
+
+    /**
+     * 体检引擎：权益敞口 E = Σ(amt×eq%)；现金桶 = Σ(货币现金 amt×(1−eq%))；
+     * 稳健 = total − E − 现金桶（≥0 恒成立）。五灯输出判定依据数字与计入明细。
+     * @param {{name:string,type:string,amt:number,eq:number}[]} items
+     * @param {typeof PARAM_DEFAULTS} prm
+     */
+    function analyze(items, prm) {
+      const rows = items.map((h) => {
+        const eq = clamp(Math.round(Number(h.eq) || 0), 0, 100);
+        const esop = isEsopHolding(h);
+        const eqAmt = (h.amt * eq) / 100;
+        const cashAmt = h.type === '货币现金' ? (h.amt * (100 - eq)) / 100 : 0;
+        return { name: String(h.name ?? ''), type: h.type, amt: Number(h.amt) || 0, eq, esop, eqAmt, cashAmt };
+      });
+      const total = rows.reduce((s, r) => s + r.amt, 0);
+      const eqSum = rows.reduce((s, r) => s + r.eqAmt, 0);
+      const cashSum = rows.reduce((s, r) => s + r.cashAmt, 0);
+      const sbSum = Math.max(0, total - eqSum - cashSum);
+      const safe = cashSum + sbSum; // 应急可用：现金＋稳健
+      const eqPct = total > 0 ? (eqSum / total) * 100 : 0;
+      const cashPct = total > 0 ? (cashSum / total) * 100 : 0;
+      const byAmt = [...rows].sort((a, b) => b.amt - a.amt);
+      const top = byAmt[0] ?? null;
+      const topPct = top && total > 0 ? (top.amt / total) * 100 : 0;
+      const n = rows.length;
+      const typeCount = new Set(rows.map((r) => r.type)).size;
+
+      /** 带宽灯通用：0 档=绿；≤1 档=黄；>1 档=红 */
+      const bandTone = (v, t, b) => {
+        const beyond = Math.max(0, Math.max((t - b) - v, v - (t + b)));
+        return { beyond, tone: beyond <= 0 ? 'ok' : beyond <= b ? 'warn' : 'danger' };
+      };
+
+      const lights = [];
+
+      // ① 应急覆盖 =（现金＋稳健）÷ M
+      if (prm.m > 0) {
+        const cover = safe / prm.m;
+        const tone = cover >= 6 ? 'ok' : cover >= 3 ? 'warn' : 'danger';
+        lights.push({
+          id: 'emergency',
+          emoji: tone === 'ok' ? '🟢' : tone === 'warn' ? '🟡' : '🔴',
+          tone,
+          name: '应急覆盖',
+          key: `${cover.toFixed(1)} 个月`,
+          basis:
+            `现金 ${fmtInt(cashSum)} ＋ 稳健 ${fmtInt(sbSum)} = ${fmtInt(safe)} 元，÷ 月支出 ${fmtInt(prm.m)} 元 = ${cover.toFixed(1)} 个月` +
+            `（≥6 🟢 / ≥3 🟡 / <3 🔴）。`,
+          table: {
+            head: ['持仓', '金额(元)', '计入比例', '计入(元)', '桶'],
+            rows: rows
+              .filter((r) => (100 - r.eq) > 0) // 对应急桶（现金+稳健）有贡献的持仓
+              .map((r) => ({
+                name: r.name + (r.esop ? '（ESOP）' : ''),
+                cells: [fmtInt(r.amt), `${100 - r.eq}%`, ((r.amt * (100 - r.eq)) / 100).toFixed(2), r.type === '货币现金' ? '现金' : '稳健'],
+              })),
+          },
+          tone_class: tone,
+        });
+      } else {
+        lights.push({
+          id: 'emergency',
+          emoji: '⚪',
+          tone: 'none',
+          name: '应急覆盖',
+          key: '—',
+          basis: '未设月生活支出 M（上方参数），无法评估可撑月数；填入后即时重算。',
+          table: null,
+        });
+      }
+
+      // ② 单一集中度 = 最大单一持仓 ÷ 组合（ESOP 从严线 20%，普通线 30%）
+      {
+        const esopTop = !!top?.esop;
+        const g = esopTop ? 20 : 30;
+        const y = esopTop ? 40 : 50;
+        const tone = topPct <= g ? 'ok' : topPct <= y ? 'warn' : 'danger';
+        lights.push({
+          id: 'concentration',
+          emoji: tone === 'ok' ? '🟢' : tone === 'warn' ? '🟡' : '🔴',
+          tone,
+          name: '单一集中度',
+          key: fmtPct(topPct),
+          basis:
+            `最大单一持仓「${top ? top.name : '—'}」${fmtInt(top?.amt ?? 0)} 元 ÷ 组合 ${fmtInt(total)} 元 = ${fmtPct(topPct)}` +
+            `（${esopTop ? '最大持仓为 ESOP，用从严线' : '普通线'}：≤${g}% 🟢 / ≤${y}% 🟡 / >${y}% 🔴）`,
+          table: {
+            head: ['持仓', '金额(元)', '占组合', 'ESOP'],
+            rows: byAmt.map((r) => ({ name: r.name, cells: [fmtInt(r.amt), fmtPct(total > 0 ? (r.amt / total) * 100 : 0), r.esop ? '是' : ''] })),
+          },
+          esopTop,
+          topPct,
+          line: { g, y },
+        });
+      }
+
+      // ③ 权益配比 = 权益敞口% vs 目标区间
+      {
+        const { beyond, tone } = bandTone(eqPct, prm.eqT, prm.eqB);
+        const em = beyond / Math.max(1, prm.eqB);
+        lights.push({
+          id: 'equity',
+          emoji: tone === 'ok' ? '🟢' : tone === 'warn' ? '🟡' : '🔴',
+          tone,
+          name: '权益配比',
+          key: fmtPct(eqPct),
+          basis:
+            `权益敞口 ${fmtInt(eqSum)} 元 ÷ 组合 ${fmtInt(total)} 元 = ${fmtPct(eqPct)}，目标 ${prm.eqT}%±${prm.eqB}%（${prm.eqT - prm.eqB}~${prm.eqT + prm.eqB}% 区间内 🟢 / 偏一档 🟡 / 偏两档 🔴）` +
+            (beyond > 0 ? `；当前${eqPct > prm.eqT ? '高' : '低'}于区间 ${beyond.toFixed(1)} 个百分点（约 ${em.toFixed(1)} 档）` : ''),
+          table: {
+            head: ['持仓', '金额(元)', '权益比例', '计入权益(元)'],
+            rows: rows
+              .filter((r) => r.eqAmt > 0)
+              .sort((a, b) => b.eqAmt - a.eqAmt)
+              .map((r) => ({ name: r.name + (r.esop ? '（ESOP）' : ''), cells: [fmtInt(r.amt), `${r.eq}%`, r.eqAmt.toFixed(2)] })),
+          },
+        });
+      }
+
+      // ④ 现金配比 = 现金% vs 目标区间
+      {
+        const { beyond, tone } = bandTone(cashPct, prm.cT, prm.cB);
+        lights.push({
+          id: 'cash',
+          emoji: tone === 'ok' ? '🟢' : tone === 'warn' ? '🟡' : '🔴',
+          tone,
+          name: '现金配比',
+          key: fmtPct(cashPct),
+          basis:
+            `现金 ${fmtInt(cashSum)} 元 ÷ 组合 ${fmtInt(total)} 元 = ${fmtPct(cashPct)}，目标 ${prm.cT}%±${prm.cB}%（${prm.cT - prm.cB}~${prm.cT + prm.cB}% 区间内 🟢 / 偏一档 🟡 / 偏两档 🔴）` +
+            (beyond > 0 ? `；当前${cashPct > prm.cT ? '高' : '低'}于区间 ${beyond.toFixed(1)} 个百分点` : ''),
+          table: {
+            head: ['持仓', '金额(元)', '现金比例', '计入现金(元)'],
+            rows: rows
+              .filter((r) => r.cashAmt > 0)
+              .map((r) => ({ name: r.name, cells: [fmtInt(r.amt), `${100 - r.eq}%`, r.cashAmt.toFixed(2)] })),
+          },
+        });
+      }
+
+      // ⑤ 分散度 = 品种数 + 类型覆盖（全部同一类型不算分散：绿最多记黄）
+      {
+        let tone = n >= 5 ? 'ok' : n >= 3 ? 'warn' : 'danger';
+        let capped = false;
+        if (tone === 'ok' && typeCount <= 1) {
+          tone = 'warn';
+          capped = true;
+        }
+        lights.push({
+          id: 'diversity',
+          emoji: tone === 'ok' ? '🟢' : tone === 'warn' ? '🟡' : '🔴',
+          tone,
+          name: '分散度',
+          key: `${n} 个 · ${typeCount} 类`,
+          basis:
+            `品种 ${n} 个（≥5 🟢 / 3~4 🟡 / ≤2 🔴），类型覆盖 ${typeCount} 类` +
+            (capped ? '；全部持仓同一类型，多只同门不算分散，绿区上限记黄' : ''),
+          table: {
+            head: ['持仓', '类型', 'ESOP'],
+            rows: byAmt.map((r) => ({ name: r.name, cells: [r.type, r.esop ? '是' : ''] })),
+          },
+        });
+      }
+
+      const red = lights.filter((l) => l.tone === 'danger').length;
+      const yellow = lights.filter((l) => l.tone === 'warn').length;
+      const none = lights.filter((l) => l.tone === 'none').length;
+
+      return { rows, total, eqSum, cashSum, sbSum, safe, eqPct, cashPct, top, topPct, n, typeCount, lights, red, yellow, none, byAmt };
+    }
+
+    /* --------------------- R7 · 建议生成器（规则引擎） --------------------- */
+
+    /**
+     * 逐条产出：现状数字 → 目标数字 → 差额 → 按定投 I 推算补齐月数。
+     * @returns {{tone: 'danger'|'warn', title: string, gap: number, text: string}[]}
+     */
+    function buildSuggestions(a, prm) {
+      const out = [];
+      const I = prm.i;
+      const months = (gap, verb) => {
+        if (!(I > 0)) return '未设定投 I（上方可改），暂无法推算补齐月数。';
+        if (!(gap > 0)) return '';
+        return `按每月定投 ${fmtInt(I)} 元推算，约 ${Math.ceil(gap / I)} 个月可${verb}（差额÷定投，向上取整）；直接调仓可一步到位。`;
+      };
+      const push = (tone, title, gap, text) => out.push({ tone, title, gap: Math.max(0, gap), text });
+
+      // ESOP 超 20%：必出行动项（红灯线 >40，黄灯线 20~40）
+      const esopRows = a.rows.filter((r) => r.esop);
+      const esopSum = esopRows.reduce((s, r) => s + r.amt, 0);
+      const esopPct = a.total > 0 ? (esopSum / a.total) * 100 : 0;
+      if (esopPct > 20) {
+        const gap = esopSum - (20 / 100) * a.total;
+        const names = esopRows.map((r) => `「${r.name}」${fmtInt(r.amt)} 元`).join('、');
+        push(
+          esopPct > 40 ? 'danger' : 'warn',
+          'ESOP 集中度超 20% 安全线',
+          gap,
+          `ESOP 持仓 ${names}，合计 ${fmtPct(esopPct)}（安全线 20%）。行动：停止新增认购，分红到账转投指数基金；` +
+            `若压回 20%，目标 ${fmtInt((20 / 100) * a.total)} 元，需转出约 ${fmtInt(gap)} 元。${months(gap, '摊薄到位')}`,
+        );
+      } else if (esopRows.length) {
+        push(
+          'warn',
+          'ESOP 安全线内，保持不再加仓',
+          0,
+          `ESOP 持仓合计 ${fmtPct(esopPct)}（≤20% 安全线内）：建议不再新增认购，分红到账转投指数基金，防止被动超线。`,
+        );
+      }
+
+      // 非 ESOP 最大持仓超普通线 30%
+      if (a.top && !a.lights.find((l) => l.id === 'concentration').esopTop && a.topPct > 30) {
+        const gap = a.top.amt - (30 / 100) * a.total;
+        push(
+          a.topPct > 50 ? 'danger' : 'warn',
+          '最大单一持仓超 30%',
+          gap,
+          `「${a.top.name}」占组合 ${fmtPct(a.topPct)}（普通线 ≤30%）。回落到 30% 目标 ${fmtInt((30 / 100) * a.total)} 元，` +
+            `需转出约 ${fmtInt(gap)} 元（转指数基金分摊）。${months(gap, '摊薄到位')}`,
+        );
+      }
+
+      // 应急覆盖不足（M>0 时）
+      const emg = a.lights.find((l) => l.id === 'emergency');
+      if (emg && emg.tone !== 'none') {
+        const cover = a.safe / prm.m;
+        if (cover < 6) {
+          const gap3 = 3 * prm.m - a.safe;
+          const gap6 = 6 * prm.m - a.safe;
+          push(
+            emg.tone === 'danger' ? 'danger' : 'warn',
+            '应急储备不足',
+            cover < 3 ? gap3 : gap6,
+            `现金＋稳健 ${fmtInt(a.safe)} 元，只够 ${cover.toFixed(1)} 个月生活（月支出 ${fmtInt(prm.m)} 元）。` +
+              (cover < 3
+                ? `先补到 3 个月：需 ${fmtInt(3 * prm.m)} 元，差额 ${fmtInt(gap3)} 元；`
+                : '') +
+              `补到 6 个月：需 ${fmtInt(6 * prm.m)} 元，差额 ${fmtInt(gap6)} 元（放货币现金/短债）。${months(cover < 3 ? gap3 : gap6, '补齐')}`,
+          );
+        }
+      }
+
+      // 权益配比偏离
+      const eqLight = a.lights.find((l) => l.id === 'equity');
+      if (eqLight && eqLight.tone !== 'ok') {
+        const hi = a.eqPct > prm.eqT;
+        const gap = Math.abs(a.eqSum - (prm.eqT / 100) * a.total);
+        push(
+          eqLight.tone === 'danger' ? 'danger' : 'warn',
+          hi ? '权益超配' : '权益低配',
+          gap,
+          `权益敞口 ${fmtInt(a.eqSum)} 元，占 ${fmtPct(a.eqPct)}，${hi ? '高于' : '低于'}目标 ${prm.eqT}%（区间 ${prm.eqT - prm.eqB}~${prm.eqT + prm.eqB}%）。` +
+            (hi
+              ? `回落到 ${prm.eqT}% 需转出约 ${fmtInt(gap)} 元（卖超配部分转入稳健/现金）。${months(gap, '摊薄到位')}`
+              : `补到 ${prm.eqT}% 需增持约 ${fmtInt(gap)} 元（用定投 I 买指数基金）。${months(gap, '补齐')}`),
+        );
+      }
+
+      // 现金配比偏离
+      const cashLight = a.lights.find((l) => l.id === 'cash');
+      if (cashLight && cashLight.tone !== 'ok') {
+        const hi = a.cashPct > prm.cT;
+        const gap = Math.abs(a.cashSum - (prm.cT / 100) * a.total);
+        push(
+          cashLight.tone === 'danger' ? 'danger' : 'warn',
+          hi ? '现金偏多' : '现金储备不足',
+          gap,
+          `现金 ${fmtInt(a.cashSum)} 元，占 ${fmtPct(a.cashPct)}，${hi ? '高于' : '低于'}目标 ${prm.cT}%（区间 ${prm.cT - prm.cB}~${prm.cT + prm.cB}%）。` +
+            (hi
+              ? `回落到 ${prm.cT}% 可转投约 ${fmtInt(gap)} 元（进稳健/权益）。${months(gap, '摊薄到位')}`
+              : `补到 ${prm.cT}% 需备现金约 ${fmtInt(gap)} 元（放货币现金）。${months(gap, '补齐')}`),
+        );
+      }
+
+      // 分散度不足（无金额差额，给单只上限参考）
+      const div = a.lights.find((l) => l.id === 'diversity');
+      if (div && div.tone !== 'ok') {
+        push(
+          div.tone === 'danger' ? 'danger' : 'warn',
+          '分散度不足',
+          0,
+          `品种 ${a.n} 个、类型 ${a.typeCount} 类。建议品种补到 ≥5 个、类型 ≥3 类（例如配 1 只宽基指数＋1 只债券/货币＋保留 ESOP）；` +
+            `新增单只建议 ≤ 组合 20%（约 ${fmtInt((20 / 100) * a.total)} 元）。`,
+        );
+      }
+
+      // 紧迫度排序：红灯优先，差额大优先
+      const rank = { danger: 0, warn: 1 };
+      return out.sort((x, y) => rank[x.tone] - rank[y.tone] || y.gap - x.gap);
+    }
+
+    /* --------------------- 渲染：总评 / 五灯 / 建议 / 构成 --------------------- */
+
+    const TONE_CALLOUT = { ok: 'callout ok', warn: 'callout warn', danger: 'callout danger', none: 'callout' };
+    const TONE_EMOJI = { ok: '🟢', warn: '🟡', danger: '🔴', none: '⚪' };
+
+    /** 明细小表（行数据全部经 textContent 写入，持仓名不进 innerHTML） */
+    function miniTable(spec) {
+      const wrap = el('div', 'table-wrap');
+      const table = el('table', 'data-table pf-mini');
+      const thead = el('thead');
+      const trh = el('tr');
+      trh.appendChild(el('th', null, spec.head[0]));
+      for (const h of spec.head.slice(1)) {
+        const th = el('th', 'num');
+        th.textContent = h;
+        trh.appendChild(th);
+      }
+      thead.appendChild(trh);
+      table.appendChild(thead);
+      const tbody = el('tbody');
+      for (const r of spec.rows) {
+        const tr = el('tr');
+        const td0 = el('td');
+        td0.textContent = r.name;
+        tr.appendChild(td0);
+        for (const c of r.cells) {
+          const td = el('td', 'num');
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      return wrap;
+    }
+
+    /** 上半屏：总评 + 五灯 + 建议 + 构成（参数/权益改动只重画这里） */
+    function renderTop() {
+      const mount = $('pf-result-mount');
+      mount.textContent = '';
+
+      if (!holdings.length) {
+        mount.appendChild(
+          el('div', 'empty', '还没有持仓记录——在上方填入或截图导入持仓后自动生成五灯体检（每盏灯可展开查看判定依据与计入明细）；数据仅存本机。'),
+        );
+        return;
+      }
+
+      const a = analyze(holdings, params);
+
+      // 总评（R6）：红/黄计数三色结论
+      {
+        let emoji;
+        let text;
+        let cls;
+        if (a.red > 0) {
+          emoji = '🔴';
+          text = `组合不合格：${a.red} 处红灯${a.yellow ? `、${a.yellow} 处黄灯` : ''}——先看下方红灯建议。`;
+          cls = 'danger';
+        } else if (a.yellow > 0) {
+          emoji = '🟡';
+          text = `${a.yellow} 处值得优化：无红灯，按建议逐条调整即可。`;
+          cls = 'warn';
+        } else {
+          emoji = '🟢';
+          text = '组合合格，撑得起生活模型：五灯全绿，保持节奏即可。';
+          cls = 'ok';
+        }
+        if (a.none > 0) text += '（应急灯待设月支出 M）';
+        const call = el('div', TONE_CALLOUT[cls]);
+        call.append(`${emoji} `, el('b', null, '总评：'), text);
+        mount.appendChild(call);
+      }
+
+      // 五灯（每灯 details 可展开：判定依据 + 计入明细）
+      const grid = el('div', 'pf-lights');
+      for (const l of a.lights) {
+        const det = el('details', `pf-light ${l.tone === 'none' ? 'pf-light-none' : ''}`);
+        det.dataset.tone = l.tone;
+        const summary = el('summary');
+        const em = el('span', 'pf-light-emoji', l.emoji);
+        const nm = el('span', 'pf-light-name', l.name);
+        const key = el('span', 'pf-light-key num', l.key);
+        summary.append(em, nm, key);
+        det.appendChild(summary);
+        const body = el('div', 'pf-light-body');
+        const pBasis = el('p', 'pf-light-basis');
+        pBasis.textContent = l.basis; // 含持仓名（用户数据），一律走 textContent
+        body.appendChild(pBasis);
+        if (l.table && l.table.rows.length) body.appendChild(miniTable(l.table));
+        else if (l.table) body.appendChild(el('p', 'hint', '无计入项。'));
+        det.appendChild(body);
+        grid.appendChild(det);
+      }
+      mount.appendChild(grid);
+
+      // 建议生成器（R7）
+      const sugWrap = el('div', 'pf-sugg-wrap');
+      sugWrap.appendChild(el('h3', null, '🛠 优化建议（按紧迫度排序；金额可逐条复算）'));
+      const sugg = buildSuggestions(a, params);
+      if (!sugg.length) {
+        const call = el('div', 'callout ok');
+        call.textContent = '🟢 五灯全绿：暂无必改项，按计划保持定投即可。';
+        sugWrap.appendChild(call);
+      } else {
+        const ol = el('ol', 'pf-sugg');
+        sugg.forEach((s, i) => {
+          const li = el('li', `pf-sugg-item ${s.tone === 'danger' ? 'is-danger' : 'is-warn'}`);
+          const head = el('p', 'pf-sugg-head');
+          head.append(el('span', 'pf-sugg-no', `${i + 1}. `), el('b', null, s.title));
+          li.appendChild(head);
+          const p = el('p', 'pf-sugg-text');
+          p.textContent = s.text;
+          li.appendChild(p);
+          ol.appendChild(li);
+        });
+        sugWrap.appendChild(ol);
+        sugWrap.appendChild(el('p', 'hint', '月数＝差额÷每月定投 I（向上取整）；转出类建议直接调仓可立即完成，月数为按定投自然摊薄的口径。'));
+      }
+      mount.appendChild(sugWrap);
+
+      // 资产构成：三桶（敞口口径）+ 类型分布
+      const distWrap = el('div', 'pf-dist-wrap');
+      distWrap.appendChild(el('h3', null, '🥧 资产构成（敞口口径）'));
+      distWrap.appendChild(el('p', 'hint', '权益敞口＝Σ(金额×权益%)；现金＝货币现金×(1−权益%)；稳健＝组合−权益−现金（债券与混合型的非权益部分、黄金与其他）。'));
+      const buckets = [
+        { name: `权益敞口 ${fmtPct(a.eqPct)}`, amt: a.eqSum, color: 'var(--c-invest)' },
+        { name: `稳健 ${fmtPct(a.total > 0 ? (a.sbSum / a.total) * 100 : 0)}`, amt: a.sbSum, color: 'var(--c-cushion)' },
+        { name: `现金 ${fmtPct(a.cashPct)}`, amt: a.cashSum, color: 'var(--c-consume)' },
+      ];
+      const bucketBox = el('div', 'pf-dist');
+      for (const b of buckets) {
+        const row = el('div', 'pf-dist-row');
+        const nm = el('span', 'pf-dist-name');
+        nm.textContent = b.name;
+        const bar = el('span', 'pf-dist-bar');
+        const fill = el('i');
+        fill.style.width = `${a.total > 0 ? Math.max(0, Math.min(100, (b.amt / a.total) * 100)) : 0}%`;
+        fill.style.background = b.color;
+        bar.appendChild(fill);
+        const amt = el('span', 'pf-dist-amt num');
+        amt.textContent = `${fmtInt(b.amt)} 元`;
+        row.append(nm, bar, amt);
+        bucketBox.appendChild(row);
+      }
+      distWrap.appendChild(bucketBox);
+
+      const typeBox = el('div', 'pf-dist');
+      for (const t of TYPES) {
+        const amt = a.rows.filter((r) => r.type === t).reduce((s, r) => s + r.amt, 0);
+        if (!(amt > 0)) continue;
+        const row = el('div', 'pf-dist-row');
+        const nm = el('span', 'pf-dist-name');
+        nm.textContent = `${t} ${fmtPct((amt / a.total) * 100)}`;
+        const bar = el('span', 'pf-dist-bar');
+        const fill = el('i');
+        fill.style.width = `${Math.min(100, (amt / a.total) * 100)}%`;
+        fill.style.background = TYPE_COLORS[t] ?? 'var(--c-esop)';
+        bar.appendChild(fill);
+        const amtEl = el('span', 'pf-dist-amt num');
+        amtEl.textContent = `${fmtInt(amt)} 元`;
+        row.append(nm, bar, amtEl);
+        typeBox.appendChild(row);
+      }
+      distWrap.appendChild(typeBox);
+      mount.appendChild(distWrap);
+    }
+
+    /** 下半屏：持仓编辑器（类型/权益% 逐条可改 + ESOP 标记 + 删除）。
+     * 必须遍历 holdings 原对象（analyze() 产出的是副本）——编辑/删除都按引用回写。 */
+    function renderHoldings() {
+      const mount = $('pf-holdings-mount');
+      mount.textContent = '';
+      if (!holdings.length) return;
+
+      const total = holdings.reduce((s, x) => s + x.amt, 0);
+      const sorted = [...holdings].sort((x, y) => y.amt - x.amt);
+
+      const wrap = el('div', 'table-wrap');
+      const table = el('table', 'data-table pf-holdings');
+      table.innerHTML = '<thead><tr><th>持仓</th><th>类型</th><th>金额(元)</th><th>占组合</th><th>权益 %</th><th></th></tr></thead>';
+      const tbody = el('tbody');
+      sorted.forEach((h) => {
+        const tr = el('tr');
+
+        const tdName = el('td');
+        const nm = el('span', null);
+        nm.textContent = h.name;
+        tdName.appendChild(nm);
+        if (isEsopHolding(h)) {
+          const tag = el('span', 'pf-esop-tag', 'ESOP');
+          tag.title = '公司股/虚拟股：集中度灯按从严线 20%/40% 评估，超 20% 触发「停止认购、分红转指数」建议。';
+          tdName.appendChild(tag);
+        }
+        tr.appendChild(tdName);
+
+        const tdType = el('td');
+        const sel = el('select');
+        sel.innerHTML = TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
+        sel.value = h.type;
+        sel.setAttribute('aria-label', `类型：${h.name}`);
+        sel.addEventListener('change', () => {
+          h.type = sel.value;
+          h.eq = DEFAULT_EQ[h.type] ?? 0; // 换类型 → 重置默认敞口
+          persist().catch(() => {});
+        });
+        tdType.appendChild(sel);
+        tr.appendChild(tdType);
+
+        const tdAmt = el('td', 'num');
+        tdAmt.textContent = fmtInt(h.amt);
+        tr.appendChild(tdAmt);
+
+        const tdShare = el('td', 'num');
+        tdShare.textContent = fmtPct(total > 0 ? (h.amt / total) * 100 : 0);
+        tr.appendChild(tdShare);
+
+        const tdEq = el('td');
+        const eqInput = el('input');
+        eqInput.type = 'number';
+        eqInput.min = '0';
+        eqInput.max = '100';
+        eqInput.step = '5';
+        eqInput.value = String(clamp(Math.round(Number(h.eq) || 0), 0, 100));
+        eqInput.setAttribute('aria-label', `权益比例（%）：${h.name}`);
+        eqInput.addEventListener('input', () => {
+          h.eq = clamp(Number(eqInput.value) || 0, 0, 100);
+          renderTop(); // R2：改权益比例 → 灯即时重算（不重建表格，不丢焦点）
+        });
+        eqInput.addEventListener('change', () => {
+          persist().catch(() => {});
+        });
+        tdEq.appendChild(eqInput);
+        tr.appendChild(tdEq);
+
+        const tdOp = el('td');
+        const btn = el('button', 'btn', '删除');
+        btn.type = 'button';
+        btn.addEventListener('click', async () => {
+          if (!confirm(`删除持仓「${h.name}」？`)) return;
+          holdings = holdings.filter((x) => x !== h); // 按引用删除（sorted 行遍历的是原对象）
+          await persist();
+        });
+        tdOp.appendChild(btn);
+        tr.appendChild(tdOp);
+
+        tbody.appendChild(tr);
+      });
       table.appendChild(tbody);
       wrap.appendChild(table);
       mount.appendChild(wrap);
-      mount.appendChild(el('p', 'hint', `合计 ${fmtInt(total)} 元 · 保存于本机 pf_holdings 实体，改版/重启不丢失。`));
+      mount.appendChild(el('p', 'hint', `合计 ${fmtInt(total)} 元 · 权益 % 可逐条修改（改完灯即时重算）· 保存于本机 pf_holdings 实体，改版/重启不丢失。`));
     }
 
     function renderAll() {
-      renderResult($('pf-mount'));
+      renderTop();
+      renderHoldings();
       document.body.dataset.holdings = String(holdings.length);
     }
 
     /* --------------------------------- 装配 --------------------------------- */
 
-    /** 从 idb 重读 pf_holdings 到内存（boot 装配与 O-4 同步事件订阅共用） */
-    async function loadHoldings() {
+    /** 从 idb 重读 pf_holdings（含 params 合并）+ txns/plan 文档（自动参数源） */
+    async function loadAll() {
       try {
         const rec = await kvGet('pf_holdings');
-        holdings = rec && !rec.deleted && Array.isArray(rec.value?.items) ? rec.value.items : [];
+        const v = rec && !rec.deleted && rec.value && typeof rec.value === 'object' ? rec.value : null;
+        // 兼容两种历史 shape：旧 {items} / T9 {items, params}
+        const items = Array.isArray(v?.items) ? v.items : Array.isArray(v) ? v : [];
+        holdings = items.map(normalizeHolding).filter((h) => h.name && h.amt > 0);
+        params = mergeParams(v?.params);
       } catch { /* idb 不可用：空态 */ }
+      try {
+        const rec = await kvGet('txns');
+        _txnsDoc = rec && !rec.deleted && rec.value && Array.isArray(rec.value.txns) ? rec.value : null;
+      } catch { _txnsDoc = null; }
+      try {
+        const rec = await kvGet('plan');
+        _planDoc = rec && !rec.deleted && rec.value && typeof rec.value === 'object' ? rec.value : null;
+      } catch { _planDoc = null; }
+      refreshAutoParams();
+      syncParamsUI();
     }
 
-    /** O-4：同步采纳（含墓碑）命中 pf_holdings → 重读重渲染（幂等，不回写不循环） */
+    /** O-4：同步采纳（含墓碑）→ 重读重渲染（幂等，不回写不循环） */
     function reloadFromStore() {
-      loadHoldings().then(renderAll).catch(() => { /* 保持现状 */ });
+      loadAll()
+        .then(renderAll)
+        .catch(() => { /* 保持现状 */ });
     }
     addEventListener('chijia:applied', (e) => {
-      if (Array.isArray(e.detail?.entities) && e.detail.entities.includes('pf_holdings')) reloadFromStore();
+      const ents = Array.isArray(e.detail?.entities) ? e.detail.entities : [];
+      if (ents.some((x) => ['pf_holdings', 'txns', 'plan'].includes(x))) reloadFromStore();
     });
     try {
       const bcSync = new BroadcastChannel('chijia');
       bcSync.addEventListener('message', (e) => {
-        if (e.data?.type === 'sync-applied' && Array.isArray(e.data.entities) &&
-            e.data.entities.includes('pf_holdings')) reloadFromStore();
+        const ents = Array.isArray(e.data?.entities) ? e.data.entities : [];
+        if (e.data?.type === 'sync-applied' && ents.some((x) => ['pf_holdings', 'txns', 'plan'].includes(x))) reloadFromStore();
       });
     } catch { /* 无 BroadcastChannel 环境（同窗口事件通道兜底） */ }
 
     installAutoSync(); // BUG-007：online 事件自动补发 outbox（与 core.boot 侧协议对齐）
     buildForm($('pf-form-mount'));
-    await loadHoldings();
+    buildOcr($('pf-ocr-mount')); // T7：截图导入持仓（上传/拍照 → 识别 → 候选确认表）
+    buildParams($('pf-params-mount')); // T9：参数三件套
+    await loadAll();
     renderAll();
+    refreshQueueBadge(); // 恢复待识别队列徽标
+    if (navigator.onLine) processPendingOcr(); // 上次离线滞留的截图，在线即自动补识别并弹确认表
+    addEventListener('online', () => processPendingOcr()); // T7：online 自动补识别（与 installAutoSync 各司其职）
     document.body.dataset.ready = 'portfolio';
 
     if ('serviceWorker' in navigator) {

@@ -8,7 +8,7 @@
   <title>持家 · 计划</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.7">
 </head>
 <body data-page="plan">
 
@@ -32,14 +32,14 @@
     <details class="panel" id="plan-panel">
       <summary>④ 参数面板</summary>
       <div class="panel-body" id="plan-panel-mount">
-        <p class="empty">在此调整月收入/四池分配/收益率/年数，点「按参数重算」后 1.1~1.4 与预期分布自动更新。</p>
+        <p class="empty">在此调整计划月收入（工资月均自动派生+可覆盖）/ 每月三池（定投·安全垫·ESOP）/ 安全垫上限 / 年度奖金与发放月 / 计划月数 / 收益率，点「按参数重算」后 1.1~1.4 与预期分布自动更新；消费=月收入−三池合计，自动推导。</p>
       </div>
     </details>
 
-    <!-- 发送到计算器（UX-SPEC 流程③：FFC_PREFILL 预填，30 分钟有效） -->
+    <!-- 发送到计算器（UX-SPEC 流程③：FFC_PREFILL 持续同步，参数变化即刷新） -->
     <div class="quick-actions">
       <button class="btn" id="send-to-calc" type="button">🧮 发送到计算器</button>
-      <span class="hint" id="send-hint">把当前月可支配收入/消费池/期初本金预填到计算器（30 分钟内有效）。</span>
+      <span class="hint" id="send-hint">计划参数变化会持续更新预填；点此切到计算器并自动填入。</span>
     </div>
 
     <!-- 1.1 ~ 1.4 章节 + 1.5 保护规则（rules 双栏由 renderParts 生成） -->
@@ -53,7 +53,7 @@
   <script type="module">
     import {
       boot, rerender, renderHero, renderOverview, renderParts,
-      buildPlanBlocks, getCurrentData, fmtInt,
+      buildPlanBlocks, buildExpectedSides, getCurrentData,
     } from './src/core.js';
 
     boot('plan');
@@ -61,7 +61,8 @@
     /**
      * 参数重算联动（UX-SPEC 流程②）：
      * 1.1~1.4 由 buildPlanBlocks(plan) 重新生成并全部展开；
-     * Hero 计划期末（估）与总览期末合计同步更新为推演结果。
+     * Hero 计划期末与总览预期侧（构成行/占比/堆叠条/对照表/结构读数）由
+     * buildExpectedSides 整块动态生成（⑫A 方案A，与首渲染同源）。
      */
     function updatePlanViews(plan, res) {
       const data = getCurrentData();
@@ -78,29 +79,15 @@
         );
       }
 
-      // Hero（计划期末「估」项更新为推演值）
-      if (data.hero?.exp) {
-        const hero = structuredClone(data.hero);
-        for (const it of hero.exp.items ?? []) {
-          const lab = String(it.label ?? '');
-          if (lab.includes('金融资产')) it.b = '≈' + fmtInt(res.endFinance);
-          else if (lab.includes('净资产')) it.b = '≈' + fmtInt(res.endNet);
-        }
-        renderHero(document.getElementById('hero-mount'), hero);
-      }
-
-      // 总览（计划期末合计与金融资产行同步推演值；构成比例保持账本口径）
-      if (data.overview?.exp) {
-        const ov = structuredClone(data.overview);
-        ov.exp.total = '≈' + fmtInt(res.endNet);
-        const financeRow = (ov.exp.rows ?? []).find((r) => String(r.name ?? '').includes('基金'));
-        if (financeRow) {
-          financeRow.amt = '≈' + fmtInt(res.endFinance);
-          const net = Math.max(1, res.endNet);
-          financeRow.pc = Math.round((res.endFinance / net) * 100) + '%';
-        }
-        renderOverview(document.getElementById('overview-mount'), ov);
-      }
+      // Hero（计划期末）+ 总览预期侧：整块按参数推演（⑫A：不再读数据包静态 exp）
+      const expected = buildExpectedSides(data, plan);
+      renderHero(document.getElementById('hero-mount'), { ...data.hero, exp: expected.hero });
+      renderOverview(document.getElementById('overview-mount'), {
+        ...data.overview,
+        exp: expected.overview,
+        tableRows: expected.tableRows,
+        readout: expected.readout,
+      });
     }
 
     // boot 参数面板 onChange / 启动恢复已存参数 时广播（detail: {plan, res}）
@@ -120,24 +107,50 @@
 
     /** 最近一次重算的参数缓存（planrecalc 事件在首渲染即广播，故始终有值） */
     let lastPlan = null;
-    addEventListener('chijia:planrecalc', (e) => {
-      lastPlan = e.detail?.plan ?? lastPlan;
-    });
 
-    // UX-SPEC 流程③：FFC_PREFILL 预填（30 分钟有效），计算器页负责消费
-    document.getElementById('send-to-calc')?.addEventListener('click', () => {
+    /* UX-SPEC 流程③：FFC_PREFILL 预填，计算器页负责消费。
+     * T6 修订：参数变化即持续刷新本键（无过期语义；30 分钟 TTL 仅留在计算器侧兜底）
+     * ——planrecalc 在首渲染与每次重算都广播，这里跟着持续写入，计算器任何时刻
+     * 打开/切 Tab 都能拿到当前计划参数（④a 默认联动）。 */
+    function writePrefill() {
       const data = getCurrentData();
-      const cur = lastPlan ?? { income: 10500, consume: 6000, base: 0 };
+      // T8 消费推导口径：plan 无 consume 字段（消费=月收入−三池，推导值）——预填时现算；
+      // 负值（三池超收入，面板红字态）时钳 0，计算器侧不接收负消费
+      const cur = lastPlan ?? { income: 10500, invest: 4000, cushion: 3000, cushionCap: 24000, esop: 5000, base: 0 };
+      const consume = cur.income - (cur.invest + cur.cushion + cur.esop);
       try {
         localStorage.setItem('FFC_PREFILL', JSON.stringify({
           ts: Date.now(),
           label: data?.meta?.calculator?.label ?? '来自计划页',
-          fields: { income: cur.income, spend: cur.consume, base: cur.base },
+          fields: { income: cur.income, spend: Math.max(0, consume), base: cur.base },
         }));
       } catch { /* 隐私模式：预填不可用，计算器仍可手填 */ }
+    }
+
+    // 参数变化即刷新预填（250ms 微防抖合并连续键入；首渲染广播也会触发一次）
+    let prefillTimer = 0;
+    addEventListener('chijia:planrecalc', (e) => {
+      lastPlan = e.detail?.plan ?? lastPlan;
+      clearTimeout(prefillTimer);
+      prefillTimer = setTimeout(writePrefill, 250);
+    });
+
+    // 改动④：壳内不再开新标签——postMessage 通知壳切到 🧮 计算器 Tab（复用壳
+    // 既有 tab 切换 + 惰性加载；计算器已加载过时由壳调 applyPrefill 钩子重放预填）；
+    // 直开 plan.html（无壳）时退回 window.open，保证预填仍可达。
+    document.getElementById('send-to-calc')?.addEventListener('click', () => {
+      clearTimeout(prefillTimer);
+      writePrefill(); // 立即刷新一次，确保 ts 新鲜
+      const data = getCurrentData();
       const hint = document.getElementById('send-hint');
-      if (hint) hint.textContent = '已发送 ✓ 计算器将在打开时自动填入（30 分钟内有效）。';
-      window.open((data?.meta?.calculator?.file ?? './calculator.html'), '_blank');
+      const framed = window.parent && window.parent !== window;
+      if (framed) {
+        window.parent.postMessage({ src: 'chijia-frame', action: 'goto', tab: 'calculator', hook: 'applyPrefill' }, '*');
+        if (hint) hint.textContent = '已发送 ✓ 已切到计算器页并自动填入（计划参数变化会持续同步）。';
+      } else {
+        window.open((data?.meta?.calculator?.file ?? './calculator.html'), '_blank');
+        if (hint) hint.textContent = '已发送 ✓ 计算器将在打开时自动填入当前计划参数。';
+      }
     });
 
     /* ----------------------- BUG-008：直达滚动就绪辅助 ----------------------- */
