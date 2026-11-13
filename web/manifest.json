@@ -1,0 +1,18 @@
+{
+  "name": "持家 · 本地优先的个人财务 APP",
+  "short_name": "持家",
+  "description": "账本 + 计划推演 + 流水分析 + FIRE 计算器 + 组合体检，数据不出本机",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7fb",
+  "theme_color": "#f5f7fb",
+  "lang": "zh-CN",
+  "version": "3.0.1",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

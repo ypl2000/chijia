@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f7fb">
+<meta name="description" content="持家 v3 · 本地优先的个人财务 APP，数据不出本机">
+<title>持家 · 本地优先的个人财务 APP</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="stylesheet" href="app.css?v=3.0.1">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div><b>持家</b><small>chijia v3</small></div>
+    </div>
+    <nav class="side-nav" id="side-nav" aria-label="主导航"></nav>
+    <div class="side-foot">
+      <div class="privacy-chip" id="privacy-chip"><span class="dot"></span><span>本机运行 · 零外发</span></div>
+      <small>数据仅存此设备</small>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-titles"><h1 id="page-title">首页</h1><p id="page-sub"></p></div>
+      <div class="topbar-actions">
+        <span class="sync-pill" id="sync-pill" hidden></span>
+        <button class="icon-btn" id="theme-btn" title="切换深浅主题" aria-label="切换深浅主题"></button>
+        <button class="icon-btn" id="lock-btn" title="锁定屏幕" aria-label="锁定屏幕"></button>
+      </div>
+    </header>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+
+  <nav class="tabbar" id="tabbar" aria-label="底部导航"></nav>
+</div>
+
+<div id="toast-host" role="status" aria-live="polite"></div>
+<div id="modal-host"></div>
+<div id="lock-screen" class="lock-screen" hidden>
+  <div class="lock-box"><span class="brand-mark big"></span><h2>已锁定</h2><p>财务数据已隐藏。点击解锁返回。</p>
+  <button class="btn btn-primary" id="unlock-btn">解锁</button></div>
+</div>
+
+<script src="js/core/fmt.js"></script>
+<script src="js/core/formats.js"></script>
+<script src="js/core/statement.js"></script>
+<script src="js/core/plan.js"></script>
+<script src="js/core/fire.js"></script>
+<script src="js/core/health.js"></script>
+<script src="js/core/portfolio.js"></script>
+<!-- ui.js 必须先于 ocr.js 与 views：它们会在加载期取用 CJ.ui -->
+<script src="js/ui.js"></script>
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/ocr.js"></script>
+<script src="js/views/home.js"></script>
+<script src="js/views/plan.js"></script>
+<script src="js/views/analysis.js"></script>
+<script src="js/views/calculator.js"></script>
+<script src="js/views/portfolio.js"></script>
+<script src="js/views/settings.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

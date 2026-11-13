@@ -1,0 +1,16 @@
+# 运行时数据（含 token / SQLite / 本地配置）——绝不入库
+backend/data/
+# 本地 OCR 依赖与构建产物
+__pycache__/
+*.py[cod]
+*.venv/
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+# 无头浏览器临时 profile
+.cdp-profile/
+# 测试截图产物（非源码，且可能含本地渲染内容）
+tests/shots/
+# 本地工具 / 隐私目录
+.workbuddy/
